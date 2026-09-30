@@ -2,13 +2,14 @@
  * BitChord web — song row.
  *
  * Mirrors the app's SongRow: 52dp-ish artwork, title over credit, the
- * now-playing highlight matched on title+artist (isSameTrackAs), a long-press
- * action sheet on mobile / right-click on desktop, and optional trailing
- * buttons.
+ * now-playing highlight matched on title+artist, a long-press action sheet on
+ * mobile / right-click on desktop, and optional trailing buttons. Artwork
+ * rides SmartArt so proxy failures fall back to YouTube's own stills.
  */
 
-import { artworkAt, ROW_ART_PX } from '../api/models';
+import { useState } from 'react';
 import type { Song } from '../api/models';
+import { SmartArt } from './SmartArt';
 import { LikeFilledIcon, LikeIcon, MoreIcon, PauseIcon, PlayIcon } from './icons';
 
 interface SongRowProps {
@@ -38,9 +39,9 @@ export function SongRow({
   trailing,
   onRemove,
 }: SongRowProps) {
+  const [pressed, setPressed] = useState(false);
   const isCurrent =
     current != null && current.title === song.title && current.artist === song.artist;
-  const art = artworkAt(song.thumbnailUrl, ROW_ART_PX);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     if (onMenu) {
@@ -51,17 +52,16 @@ export function SongRow({
 
   return (
     <div
-      className="song-row"
+      className={`song-row${pressed ? ' song-row-pressed' : ''}`}
       onClick={onPlay}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
       onContextMenu={handleContextMenu}
       data-current={isCurrent || undefined}
     >
       {index !== undefined && <span className="song-row-index label-medium">{index + 1}</span>}
-      {art ? (
-        <img className="row-art" src={art} alt="" loading="lazy" width={52} height={52} />
-      ) : (
-        <div className="row-art" style={{ width: 52, height: 52 }} />
-      )}
+      <SmartArt src={song.thumbnailUrl} videoId={song.videoId} size={52} radius={8} className="row-art-wrap" />
       <div className="song-row-text">
         <span className="song-row-title body-large" style={isCurrent ? { color: 'var(--accent)' } : undefined}>
           {song.title}
@@ -80,7 +80,7 @@ export function SongRow({
         {onRemove && (
           <button className="icon-button" onClick={onRemove} aria-label="Remove">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l-4.9-4.9q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l4.9 4.9l4.9-4.9q.275-.275.7-.275t.7.275t.275.7t-.275.7l-4.9 4.9l4.9 4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275Z" />
+              <path d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l4.9-4.9q.275-.275-.7-.275t.7-.275t.7.275t.275.7t-.275.7l-4.9 4.9l4.9-4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275Z" />
             </svg>
           </button>
         )}

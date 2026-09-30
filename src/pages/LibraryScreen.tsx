@@ -9,8 +9,8 @@
 import { useState } from 'react';
 import type { Song } from '../api/models';
 import { actions, useApp, usePlayer } from '../state/store';
-import { SectionTitle } from '../components/common';
 import { SongRow } from '../components/SongRow';
+import { SmartArt } from '../components/SmartArt';
 import type { UserPlaylist } from '../data/library';
 
 export function LibraryScreen() {
@@ -42,15 +42,10 @@ export function LibraryScreen() {
         Library
       </h1>
 
-      <SectionTitle
-        trailing={
-          <button className="text-button label-medium" onClick={() => setCreating(true)}>
-            New playlist
-          </button>
-        }
-      >
-        Playlists
-      </SectionTitle>
+      <div className="page-gutter shelf-header-row">
+        <h2 className="title-large">Playlists</h2>
+        <button className="text-button label-medium" onClick={() => setCreating(true)}>New playlist</button>
+      </div>
       {creating && (
         <div className="page-gutter" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input
@@ -82,17 +77,14 @@ export function LibraryScreen() {
         )}
       </div>
 
-      <SectionTitle
-        trailing={
-          liked.length > 0 ? (
-            <button className="text-button label-medium" onClick={() => playAll(liked, 'Liked songs')}>
-              Play all
-            </button>
-          ) : undefined
-        }
-      >
-        Liked songs
-      </SectionTitle>
+      <div className="page-gutter shelf-header-row">
+        <h2 className="title-large">Liked songs</h2>
+        {liked.length > 0 && (
+          <button className="text-button label-medium" onClick={() => playAll(liked, 'Liked songs')}>
+            Play all
+          </button>
+        )}
+      </div>
       {liked.length === 0 ? (
         <div className="page-gutter empty-hint body-medium" style={{ color: 'var(--on-surface-variant)' }}>
           Tracks you like land here. They are saved on this device.
@@ -111,7 +103,9 @@ export function LibraryScreen() {
         ))
       )}
 
-      <SectionTitle>History</SectionTitle>
+      <div className="page-gutter shelf-header-row">
+        <h2 className="title-large">History</h2>
+      </div>
       {history.length === 0 ? (
         <div className="page-gutter empty-hint body-medium" style={{ color: 'var(--on-surface-variant)' }}>
           Plays are recorded here as you listen.
@@ -142,13 +136,10 @@ function PlaylistCard({
   onDelete: () => void;
 }) {
   const cover = playlist.songs[0]?.thumbnailUrl ?? null;
+  const coverVideo = playlist.songs[0]?.videoId ?? null;
   return (
     <div className="playlist-card" onClick={onOpen}>
-      {cover ? (
-        <img className="row-art" src={cover} alt="" width={56} height={56} />
-      ) : (
-        <div className="row-art playlist-card-empty" />
-      )}
+      <SmartArt src={cover} videoId={coverVideo} size={56} radius={8} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="body-medium" style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {playlist.title}

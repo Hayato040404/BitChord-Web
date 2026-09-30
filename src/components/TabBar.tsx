@@ -11,8 +11,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { player } from '../player/player';
 import type { Song } from '../api/models';
-import { artworkAt, ROW_ART_PX } from '../api/models';
 import { useApp, usePlayer, actions } from '../state/store';
+import { SmartArt } from './SmartArt';
 import {
   ExploreIcon,
   HomeIcon,
@@ -110,11 +110,22 @@ export function BottomBars() {
               onNext={nextTrack}
               onPrev={prevTrack}
             />
+            <MiniProgress positionMs={playerState.positionMs} durationMs={playerState.durationMs} />
           </div>
           <TabPill app={app} compact={false} />
         </>
       )}
     </nav>
+  );
+}
+
+/** A hairline of progress along the top of the mini player, like the app's. */
+function MiniProgress({ positionMs, durationMs }: { positionMs: number; durationMs: number }) {
+  const fraction = durationMs > 0 ? Math.min(1, positionMs / durationMs) : 0;
+  return (
+    <div className="mini-progress" aria-hidden="true">
+      <div className="mini-progress-fill" style={{ width: `${fraction * 100}%` }} />
+    </div>
   );
 }
 
@@ -152,10 +163,9 @@ interface TransportProps {
 }
 
 function ExpandedNowPlaying({ song, playing, busy, onPlayPause, onNext, onPrev }: TransportProps) {
-  const art = artworkAt(song.thumbnailUrl, ROW_ART_PX);
   return (
     <div className="mini-player-row">
-      {art ? <img className="row-art" src={art} alt="" width={40} height={40} /> : <div className="row-art" style={{ width: 40, height: 40 }} />}
+      <SmartArt src={song.thumbnailUrl} videoId={song.videoId} size={40} radius={8} eager />
       <div className="mini-player-text">
         <span className="mini-player-title body-medium">{song.title}</span>
         <span className="mini-player-artist label-small" style={{ color: 'var(--on-surface-variant)' }}>
@@ -178,10 +188,9 @@ function ExpandedNowPlaying({ song, playing, busy, onPlayPause, onNext, onPrev }
 }
 
 function InlineNowPlaying({ song, playing, busy, onPlayPause, onNext, onExpand }: TransportProps) {
-  const art = artworkAt(song.thumbnailUrl, ROW_ART_PX);
   return (
     <div className="inline-player" onClick={onExpand} role="button" tabIndex={0}>
-      {art ? <img className="row-art" src={art} alt="" width={36} height={36} /> : <div className="row-art" style={{ width: 36, height: 36 }} />}
+      <SmartArt src={song.thumbnailUrl} videoId={song.videoId} size={36} radius={7} eager />
       <button className="icon-button" onClick={onPlayPause} aria-label={playing ? 'Pause' : 'Play'}>
         {busy ? <span className="spinner" style={{ width: 18, height: 18 }} /> : playing ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
       </button>

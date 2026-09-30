@@ -109,6 +109,14 @@ class BitChordPlayer {
     return this.state.queue[this.state.index] ?? null;
   }
 
+  /** Live media clock in ms, for animations smoother than the 250 ms tick. */
+  currentAudioTimeMs(): number | null {
+    const audio = this.active;
+    if (!audio.src || audio.paused) return null;
+    const ms = audio.currentTime * 1000;
+    return Number.isFinite(ms) ? ms : null;
+  }
+
   async playQueue(songs: Song[], startIndex = 0): Promise<void> {
     this.state.queue = [...songs];
     this.state.index = startIndex;

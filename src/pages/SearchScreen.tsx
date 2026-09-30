@@ -14,7 +14,7 @@ import { actions, useApp, usePlayer } from '../state/store';
 import { player } from '../player/player';
 import { SongRow } from '../components/SongRow';
 import { FeedSkeleton } from '../components/common';
-import { artworkAt, CARD_ART_PX } from '../api/models';
+import { SmartArt } from '../components/SmartArt';
 
 export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) => void }) {
   const app = useApp();
@@ -185,14 +185,9 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
 }
 
 function BrowseRow({ item, onClick }: { item: ShelfItem; onClick: () => void }) {
-  const art = artworkAt(item.thumbnailUrl, CARD_ART_PX);
   return (
     <button className="browse-row" onClick={onClick}>
-      {art ? (
-        <img className="row-art" src={art} alt="" loading="lazy" width={52} height={52} />
-      ) : (
-        <div className="row-art" style={{ width: 52, height: 52 }} />
-      )}
+      <SmartArt src={item.thumbnailUrl} videoId={item.videoId} size={52} radius={8} />
       <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
         <div className="body-large" style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {item.title}

@@ -4,18 +4,20 @@
  * Ported from NowPlayingScreen + PlayerControls: full-screen take-over with
  * the artwork over a palette-driven gradient, seek bar, full transport,
  * shuffle/repeat, speed and sleep timer, and pages for the queue and synced
- * lyrics (PlayerLyrics / PlayerQueue).
+ * lyrics (PlayerLyrics / PlayerQueue). Artwork rides SmartArt, so a dead
+ * proxy thumbnail falls back to YouTube's own stills instead of a blank tile.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { player } from '../player/player';
 import { actions, useApp, usePlayer } from '../state/store';
 import { formatDuration } from '../api/models';
 import { extractPalette, fallbackPalette } from '../lib/palette';
 import type { ArtworkPalette } from '../lib/palette';
-import { activeLineIndex, fetchLyrics } from '../lyrics/lyrics';
+import { fetchLyrics } from '../lyrics/providers';
 import type { Lyrics } from '../lyrics/lyrics';
-import { artworkAt, PLAYER_ART_PX } from '../api/models';
+import { LyricsPage } from './LyricsPage';
+import { SmartArt } from '../components/SmartArt';
 import { SongRow } from '../components/SongRow';
 import {
   LikeFilledIcon,
@@ -40,13 +42,15 @@ export function NowPlaying() {
   const [page, setPage] = useState<Page>('player');
   const [palette, setPalette] = useState<ArtworkPalette>(fallbackPalette);
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
+  const [lyricsState, setLyricsState] = useState<'loading' | 'ready' | 'none'>('loading');
   const [showSleep, setShowSleep] = useState(false);
   const [showSpeed, setShowSpeed] = useState(false);
 
-  const art = artworkAt(song?.thumbnailUrl, PLAYER_ART_PX);
+  const art = song?.thumbnailUrl ?? null;
 
   useEffect(() => {
     setLyrics(null);
+    setLyricsState('loading');
     if (!song) return;
     let cancelled = false;
     extractPalette(art ?? '').then((p) => {
@@ -55,8 +59,14 @@ export function NowPlaying() {
     });
     if (app.settings.syncedLyrics) {
       fetchLyrics(song, playerState.durationMs)
-        .then((l) => !cancelled && setLyrics(l))
-        .catch(() => setLyrics(null));
+        .then((l) => {
+          if (cancelled) return;
+          setLyrics(l);
+          setLyricsState(l ? 'ready' : 'none');
+        })
+        .catch(() => !cancelled && setLyricsState('none'));
+    } else {
+      setLyricsState('none');
     }
     return () => {
       cancelled = true;
@@ -96,7 +106,7 @@ export function NowPlaying() {
       {page === 'player' && (
         <div className="now-playing-player">
           <div className={`now-playing-art${playing ? ' art-playing' : ''}`}>
-            {art ? <img src={art} alt="" /> : <div className="skeleton" style={{ width: '100%', height: '100%' }} />}
+            <SmartArt src={art} videoId={song.videoId} size={480} radius={16} eager keepOriginalSize />
           </div>
           <div className="now-playing-meta">
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -153,22 +163,29 @@ export function NowPlaying() {
             <span className="label-small" style={{ color: 'rgba(255,255,255,0.6)' }}>
               {playerState.stream?.source ? `via ${playerState.stream.source}` : ''}
             </span>
-            <button className="icon-button" onClick={() => setPage('queue')} aria-label="Queue" style={{ color: 'rgba(255,255,255,0.8)' }}>
+            <button
+              className="icon-button"
+              onClick={() => setPage('queue')}
+              aria-label="Queue"
+              style={{ color: 'rgba(255,255,255,0.8)' }}
+            >
               <QueueIcon size={20} />
             </button>
-            <button className="icon-button" onClick={() => setPage('lyrics')} aria-label="Lyrics" style={{ color: 'rgba(255,255,255,0.8)' }}>
+            <button
+              className="icon-button now-playing-lyrics-button"
+              onClick={() => setPage('lyrics')}
+              aria-label="Lyrics"
+              style={{ color: lyricsState === 'ready' ? '#fff' : 'rgba(255,255,255,0.5)' }}
+            >
               <LyricsIcon size={20} />
+              {lyricsState === 'ready' && lyrics?.wordSynced && <span className="lyrics-ready-dot" />}
             </button>
           </div>
         </div>
       )}
 
-      {page === 'queue' && (
-        <QueuePage onBack={() => setPage('player')} />
-      )}
-      {page === 'lyrics' && (
-        <LyricsPage lyrics={lyrics} onBack={() => setPage('player')} />
-      )}
+      {page === 'queue' && <QueuePage onBack={() => setPage('player')} />}
+      {page === 'lyrics' && <LyricsPage lyrics={lyrics} onBack={() => setPage('player')} />}
 
       {showSleep && <SleepSheet onClose={() => setShowSleep(false)} />}
       {showSpeed && <SpeedSheet onClose={() => setShowSpeed(false)} />}
@@ -261,60 +278,6 @@ function QueuePage({ onBack }: { onBack: () => void }) {
           />
         ))}
       </div>
-    </div>
-  );
-}
-
-function LyricsPage({ lyrics, onBack }: { lyrics: Lyrics | null; onBack: () => void }) {
-  const playerState = usePlayer();
-  const activeIndex = useMemo(
-    () => (lyrics?.synced ? activeLineIndex(lyrics.lines, playerState.positionMs) : -1),
-    [lyrics, playerState.positionMs],
-  );
-  const activeRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [activeIndex]);
-
-  return (
-    <div className="lyrics-page">
-      <div className="queue-top safe-top">
-        <button className="icon-button" onClick={onBack} aria-label="Back">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10.8 16.8q.3-.3.288-.7t-.288-.7L7.8 12.5h9.4q.375 0 .638-.263t.262-.637t-.262-.638t-.638-.262H7.8l3-3q.3-.3.3-.7t-.3-.7t-.7-.3t-.7.3L5.4 11.3q-.15.15-.213.325T5.125 12t.063.375t.212.325l4.6 4.6q.275.275.688.288t.712-.288Z" />
-          </svg>
-        </button>
-        <span className="title-medium">{lyrics?.provider ?? 'Lyrics'}</span>
-        <span style={{ width: 40 }} />
-      </div>
-      {!lyrics ? (
-        <div className="lyrics-body">
-          <div className="body-large" style={{ color: 'rgba(255,255,255,0.6)' }}>
-            No lyrics found for this track.
-          </div>
-        </div>
-      ) : lyrics.synced ? (
-        <div className="lyrics-body">
-          {lyrics.lines.map((line, i) => (
-            <div
-              key={i}
-              ref={i === activeIndex ? activeRef : undefined}
-              className={`lyric-line headline-medium${i === activeIndex ? ' lyric-line-active' : ''}`}
-            >
-              {line.text}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="lyrics-body">
-          {lyrics.lines.map((line, i) => (
-            <div key={i} className="lyric-line body-large">
-              {line.text}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

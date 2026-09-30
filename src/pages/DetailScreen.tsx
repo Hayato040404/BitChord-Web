@@ -12,7 +12,7 @@ import { actions, useApp, usePlayer } from '../state/store';
 import { player } from '../player/player';
 import { ShelfCarousel } from '../components/common';
 import { SongRow } from '../components/SongRow';
-import { artworkAt, HEADER_ART_PX } from '../api/models';
+import { SmartArt } from '../components/SmartArt';
 
 export function DetailScreen({
   browseId,
@@ -51,12 +51,18 @@ export function DetailScreen({
     actions.playSongs(page.songs, Math.max(0, index), page.title);
   };
 
-  const headerArt = artworkAt(page.thumbnailUrl, HEADER_ART_PX);
-
   return (
     <div className="feed">
       <div className="detail-header">
-        {headerArt && <img className="detail-header-art" src={headerArt} alt="" />}
+        <SmartArt
+          src={page.thumbnailUrl}
+          videoId={page.songs[0]?.videoId ?? null}
+          size={720}
+          radius={0}
+          eager
+          keepOriginalSize
+          className="detail-header-art-wrap"
+        />
         <div className="detail-header-scrim" />
         <div className="detail-header-content page-gutter">
           <button className="icon-button detail-back" onClick={() => actions.popDetail()} aria-label="Back">

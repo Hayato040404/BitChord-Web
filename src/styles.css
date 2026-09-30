@@ -164,6 +164,32 @@ img {
   background: var(--surface-variant);
 }
 
+/* ---- resilient artwork (SmartArt) ---- */
+
+.smart-art {
+  display: inline-block;
+  overflow: hidden;
+  flex: none;
+  background: var(--surface-variant);
+  position: relative;
+}
+.smart-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transform: scale(1.04);
+  transition: opacity 0.35s ease, transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.smart-art-loaded img {
+  opacity: 1;
+  transform: scale(1);
+}
+.row-art-wrap {
+  border-radius: 8px;
+}
+
 /* Scrollbars: thin, only on hover-capable pointers. */
 @media (hover: hover) {
   ::-webkit-scrollbar {

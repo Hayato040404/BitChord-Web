@@ -5,9 +5,9 @@
  * carousels, the hero card, sign-in banner, feed skeletons and message states.
  */
 
-import { artworkAt, CARD_ART_PX } from '../api/models';
 import type { HomeShelf, ShelfItem } from '../api/models';
 import type { BrowseType } from '../api/models';
+import { SmartArt } from './SmartArt';
 
 export const PAGE_GUTTER = 20;
 
@@ -18,7 +18,6 @@ interface CardProps {
 }
 
 export function ShelfCard({ item, onClick, onLongPress }: CardProps) {
-  const art = artworkAt(item.thumbnailUrl, CARD_ART_PX);
   let timer: number | null = null;
 
   const start = () => {
@@ -49,7 +48,13 @@ export function ShelfCard({ item, onClick, onLongPress }: CardProps) {
       }
     >
       <div className="shelf-card-art">
-        {art ? <img src={art} alt="" loading="lazy" /> : <div className="skeleton" style={{ width: '100%', height: '100%' }} />}
+        <SmartArt
+          src={item.thumbnailUrl}
+          videoId={item.videoId}
+          size={160}
+          radius={12}
+          className="shelf-card-img"
+        />
       </div>
       <span className="shelf-card-title body-medium" style={{ fontWeight: 500 }}>
         {item.title}
@@ -103,10 +108,19 @@ export function HeroCard({
   videoId: string | null;
   onClick: () => void;
 }) {
-  const art = artworkAt(thumbnailUrl, CARD_ART_PX);
   return (
     <button className="hero-card page-gutter" onClick={onClick}>
-      <div className="hero-card-art">{art ? <img src={art} alt="" loading="lazy" /> : null}</div>
+      <div className="hero-card-art">
+        <SmartArt
+          src={thumbnailUrl}
+          videoId={videoId}
+          size={640}
+          radius={16}
+          eager
+          keepOriginalSize
+          className="hero-card-img"
+        />
+      </div>
       <div className="hero-card-overlay">
         <div>
           <span className="hero-card-label label-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>

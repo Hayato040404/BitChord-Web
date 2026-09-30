@@ -142,6 +142,22 @@
   border-radius: 28px;
   padding: 6px 10px;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.mini-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2.5px;
+  background: transparent;
+}
+.mini-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+  transition: width 0.25s linear;
 }
 
 .mini-player-row {
@@ -216,6 +232,30 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+/* SmartArt fills its card-sized frame, not its own size prop. Inline size
+   styles beat plain rules, so these win with !important. */
+.shelf-card-art .smart-art {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 12px;
+}
+.hero-card-art .smart-art {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 16px;
+}
+.detail-header-art-wrap {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0;
+}
+.detail-header-art-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .shelf-card-title {
   max-width: 100%;
@@ -649,6 +689,9 @@
   overflow-y: auto;
   padding-bottom: 24px;
 }
+
+/* ---- lyrics (PlayerLyrics port) ---- */
+
 .lyrics-body {
   flex: 1;
   overflow-y: auto;
@@ -657,6 +700,11 @@
   flex-direction: column;
   gap: 14px;
 }
+.lyrics-body-synced {
+  padding-top: 20vh;
+  padding-bottom: 46vh;
+  scroll-padding: 40vh 0;
+}
 .lyric-line {
   opacity: 0.5;
   transition: opacity 0.25s ease;
@@ -664,6 +712,102 @@
 }
 .lyric-line-active {
   opacity: 1;
+}
+
+.lyrics-wordmark {
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.14em;
+}
+
+.lyrics-big {
+  font-size: clamp(24px, 6.4vw, 32px);
+  line-height: 1.22;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.lyric-past {
+  opacity: 0.34;
+}
+.lyric-future {
+  opacity: 0.42;
+}
+.lyric-next {
+  opacity: 0.62;
+}
+.lyric-active {
+  opacity: 1;
+}
+.lyric-end {
+  text-align: right;
+  margin-left: 12%;
+}
+.lyric-background {
+  display: block;
+  font-size: 0.55em;
+  font-weight: 600;
+  opacity: 0.65;
+  margin-top: 6px;
+}
+
+/* The sung line: reveal sweeps over the dim copy as the song moves on. */
+.lyric-swept {
+  position: relative;
+}
+.lyric-swept .lyric-reveal {
+  display: block;
+}
+.lyric-word {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+.lyric-plain {
+  display: inline;
+}
+
+/* Breathing dots for instrumental stretches. */
+.lyric-gap {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 24px;
+}
+.lyric-gap span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  animation: lyric-breathe 1.8s ease-in-out infinite;
+}
+.lyric-gap span:nth-child(2) {
+  animation-delay: 0.22s;
+}
+.lyric-gap span:nth-child(3) {
+  animation-delay: 0.44s;
+}
+@keyframes lyric-breathe {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateY(-2px);
+  }
+}
+
+/* Lyrics pill on the player footer glows when word-synced lyrics exist. */
+.now-playing-lyrics-button {
+  position: relative;
+}
+.lyrics-ready-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 /* sheets */
@@ -775,6 +919,50 @@
 }
 
 /* misc */
+
+/* Detail / now-playing entrance, matched to the app's motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .detail-header {
+    animation: rise-in 0.32s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .now-playing {
+    animation: sheet-up 0.32s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .lyrics-page,
+  .queue-page {
+    animation: sheet-up 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sheet-up {
+  from {
+    opacity: 0.4;
+    transform: translateY(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.shelf-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.shelf-header-row h2 {
+  margin: 0;
+}
 
 .sign-in-banner {
   padding: 12px 20px;

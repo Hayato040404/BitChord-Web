@@ -12,7 +12,7 @@ import { player } from '../player/player';
 import { fetchHome } from '../api/repository';
 import type { HomeShelf, Song } from '../api/models';
 import { actions, useApp } from '../state/store';
-import { FeedSkeleton, MessageState, ShelfCarousel } from '../components/common';
+import { FeedSkeleton, HeroCard, MessageState, ShelfCarousel } from '../components/common';
 import type { ShelfItem } from '../api/models';
 
 export function HomeScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) => void }) {
@@ -76,6 +76,17 @@ export function HomeScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) =
         }
       : null;
 
+  // The first track of the first music shelf leads the feed, the way the
+  // app's hero card leads its first shelf.
+  const hero = shelves?.[0]?.items[0] ?? null;
+  const heroShelfItems = hero ? shelves![0].items.slice(1) : [];
+  const heroShelves: HomeShelf[] | null =
+    shelves === null
+      ? null
+      : hero
+        ? [{ title: shelves![0].title, items: heroShelfItems }, ...shelves!.slice(1)]
+        : shelves;
+
   return (
     <div className="feed">
       <h1 className="display-large page-gutter" style={{ margin: '8px 0 12px' }}>
@@ -88,9 +99,20 @@ export function HomeScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) =
       ) : (
         <>
           {recentsShelf && <ShelfCarousel shelf={recentsShelf} onItemClick={onItem} />}
-          {shelves.map((shelf, i) => (
-            <ShelfCarousel key={`${shelf.title}-${i}`} shelf={shelf} onItemClick={onItem} />
-          ))}
+          {hero && (
+            <HeroCard
+              title={hero.title}
+              subtitle={hero.subtitle}
+              thumbnailUrl={hero.thumbnailUrl ?? null}
+              videoId={hero.videoId ?? null}
+              onClick={() => onItem(hero)}
+            />
+          )}
+          {heroShelves?.map((shelf, i) =>
+            shelf.items.length > 0 ? (
+              <ShelfCarousel key={`${shelf.title}-${i}`} shelf={shelf} onItemClick={onItem} />
+            ) : null,
+          )}
         </>
       )}
     </div>
