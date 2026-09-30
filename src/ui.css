@@ -533,11 +533,52 @@
   display: flex;
   flex-direction: column;
   color: #fff;
-  animation: toast-in 0.25s ease;
+  background: #000;
 }
 .app-player-pane .now-playing {
   position: absolute;
   animation: none;
+}
+
+/* The mesh backdrop: four blurred blobs over a dimmed base, drifting on
+   track change and then settling (MeshGradient.kt). */
+.mesh-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+.mesh-blobs {
+  position: absolute;
+  inset: -35%;
+  filter: blur(56px);
+  transform: translateZ(0);
+}
+.mesh-blob {
+  position: absolute;
+  width: 62%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  transition: background 1.4s ease, left 8s cubic-bezier(0.4, 0, 0.2, 1),
+    top 8s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: left, top, background;
+}
+.mesh-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.38) 100%);
+}
+.now-playing-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.now-playing-content .lyrics-page,
+.now-playing-content .queue-page {
+  background: rgba(8, 8, 10, 0.72);
 }
 .now-playing-top {
   display: flex;
@@ -671,8 +712,9 @@
   display: flex;
   flex-direction: column;
   color: #fff;
-  background: rgba(8, 8, 10, 0.96);
-  backdrop-filter: blur(28px);
+  background: rgba(8, 8, 10, 0.55);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
 }
 .app-player-pane .queue-page,
 .app-player-pane .lyrics-page {
@@ -705,37 +747,31 @@
   padding-bottom: 46vh;
   scroll-padding: 40vh 0;
 }
-.lyric-line {
-  opacity: 0.5;
-  transition: opacity 0.25s ease;
-  text-align: left;
-}
-.lyric-line-active {
-  opacity: 1;
-}
 
+.lyrics-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .lyrics-wordmark {
   color: rgba(255, 255, 255, 0.55);
   letter-spacing: 0.14em;
 }
 
+/* The Apple sizes: the active line is huge, its neighbours step down. */
 .lyrics-big {
   font-size: clamp(24px, 6.4vw, 32px);
   line-height: 1.22;
   font-weight: 800;
   letter-spacing: -0.5px;
+  transition: opacity 0.32s ease, filter 0.38s ease;
+  will-change: opacity, filter;
 }
 .lyric-past {
-  opacity: 0.34;
 }
 .lyric-future {
-  opacity: 0.42;
-}
-.lyric-next {
-  opacity: 0.62;
 }
 .lyric-active {
-  opacity: 1;
 }
 .lyric-end {
   text-align: right;
@@ -749,51 +785,153 @@
   margin-top: 6px;
 }
 
-/* The sung line: reveal sweeps over the dim copy as the song moves on. */
+/* The sung line: the gradient lives inside each word's glyphs. */
 .lyric-swept {
   position: relative;
 }
-.lyric-swept .lyric-reveal {
-  display: block;
-}
 .lyric-word {
   display: inline-block;
-  will-change: transform, opacity;
+  will-change: transform;
+  /* Filled by the inline background-image + color:transparent. */
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+.lyric-word-done {
+  color: #fff;
+  background: none;
 }
 .lyric-plain {
   display: inline;
 }
 
-/* Breathing dots for instrumental stretches. */
+/* Manual lyric search: the escape hatch when the automatic match misses. */
+.lyrics-manual {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.lyrics-manual-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #fff;
+  outline: none;
+}
+.lyrics-manual-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+.lyrics-manual-input:focus {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.lyrics-manual-button {
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  flex: none;
+}
+.lyrics-manual-button:disabled {
+  opacity: 0.5;
+}
+.lyrics-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+}
+.lyrics-plain-line {
+  opacity: 0.85;
+}
+
+/* Instrumental breaks: three dots that fill across the break (the app's
+   drawBehind gap dots). The row only stands open while the break plays. */
 .lyric-gap {
   display: flex;
-  gap: 10px;
+  gap: 5px;
   align-items: center;
   height: 24px;
+  opacity: 0;
+  transition: opacity 0.35s ease, height 0.4s cubic-bezier(0.41, 0, 0.12, 0.99);
+  cursor: pointer;
+}
+.lyric-gap-active {
+  opacity: 1;
 }
 .lyric-gap span {
-  width: 7px;
-  height: 7px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  animation: lyric-breathe 1.8s ease-in-out infinite;
+  background: #fff;
+  flex: none;
+  transition: opacity 0.2s linear, transform 0.2s ease;
+  opacity: 0.25;
+  transform: scale(0.76);
 }
-.lyric-gap span:nth-child(2) {
-  animation-delay: 0.22s;
+
+/* Lyrics chrome: offset note, section chips, skeleton, provider link. */
+.lyrics-offset-note {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  padding-bottom: 4px;
 }
-.lyric-gap span:nth-child(3) {
-  animation-delay: 0.44s;
+.lyrics-provider-link {
+  flex: 1;
+  text-align: center;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-underline-offset: 4px;
 }
-@keyframes lyric-breathe {
-  0%,
-  100% {
-    opacity: 0.15;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 0.7;
-    transform: translateY(-2px);
-  }
+.lyric-section-chip {
+  align-self: flex-start;
+  padding: 4px 11px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 1.3px;
+  margin: 10px 0 4px;
+}
+.lyrics-skel-block {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 35px;
+}
+.lyrics-skel-bar {
+  height: 26px;
+  border-radius: 8px;
+}
+.lyrics-found-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--on-surface);
+}
+.offset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.offset-value {
+  min-width: 90px;
+  text-align: center;
+}
+.offset-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* Lyrics pill on the player footer glows when word-synced lyrics exist. */

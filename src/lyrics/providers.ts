@@ -713,16 +713,54 @@ async function fromLrclib(song: Song, durationMs: number): Promise<Lyrics | null
 
 // ---- entry point ---------------------------------------------------------------
 
-export async function fetchLyrics(song: Song, durationMs: number): Promise<Lyrics | null> {
+/** User-entered title/artist, for when the automatic match finds nothing. */
+export interface LyricOverride {
+  title: string;
+  artist: string;
+}
+
+/** How heavily a result's word-level timing weighs in the pick. */
+function wordLineCount(lyrics: Lyrics): number {
+  return lyrics.lines.filter((line) => line.words.length > 0).length;
+}
+
+/**
+ * Fetches lyrics, preferring word-synced results.
+ *
+ * The word-capable providers (BiniLyrics, PaxSenix, BetterLyrics) are raced
+ * in parallel and the winner is the word-synced answer with the most timed
+ * lines — a line-synced reply from one never blocks a word-synced reply from
+ * another, which sequential fallbacks allowed. LRCLIB (line-synced at best)
+ * only runs when every word-capable provider came back empty.
+ */
+export async function fetchLyrics(
+  song: Song,
+  durationMs: number,
+  override?: LyricOverride,
+): Promise<Lyrics | null> {
   const total = durationMs || durationMillis(song.durationText);
-  const chain = [fromBiniLyrics, fromBetterLyrics, fromPaxSenix, fromLrclib];
-  for (const provider of chain) {
-    try {
-      const lyrics = await provider(song, total);
-      if (lyrics && lyrics.lines.some((line) => line.text.trim().length > 0)) return lyrics;
-    } catch {
-      /* next provider */
-    }
+  const title = override?.title?.trim() || forLyricsSearch(song.title);
+  const artist = override?.artist?.trim() || artistForLyricsSearch(song.artist);
+  const query: Song = { ...song, title, artist };
+
+  const races = await Promise.allSettled([
+    fromBiniLyrics(query, total),
+    fromPaxSenix(query, total),
+    fromBetterLyrics(query, total),
+  ]);
+  const found = races
+    .flatMap((race) => (race.status === 'fulfilled' ? [race.value] : []))
+    .filter((lyrics): lyrics is Lyrics => lyrics !== null);
+  if (found.length > 0) {
+    const wordSynced = found.filter((lyrics) => lyrics.wordSynced);
+    const pool = wordSynced.length > 0 ? wordSynced : found;
+    pool.sort((a, b) => wordLineCount(b) - wordLineCount(a));
+    return pool[0];
   }
-  return null;
+
+  try {
+    return await fromLrclib(query, total);
+  } catch {
+    return null;
+  }
 }

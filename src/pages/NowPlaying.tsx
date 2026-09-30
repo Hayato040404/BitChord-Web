@@ -12,8 +12,7 @@ import { useEffect, useState } from 'react';
 import { player } from '../player/player';
 import { actions, useApp, usePlayer } from '../state/store';
 import { formatDuration } from '../api/models';
-import { extractPalette, fallbackPalette } from '../lib/palette';
-import type { ArtworkPalette } from '../lib/palette';
+import { MeshBackdrop } from '../components/MeshBackdrop';
 import { fetchLyrics } from '../lyrics/providers';
 import type { Lyrics } from '../lyrics/lyrics';
 import { LyricsPage } from './LyricsPage';
@@ -40,33 +39,44 @@ export function NowPlaying() {
   const playerState = usePlayer();
   const song = playerState.queue[playerState.index] ?? null;
   const [page, setPage] = useState<Page>('player');
-  const [palette, setPalette] = useState<ArtworkPalette>(fallbackPalette);
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
-  const [lyricsState, setLyricsState] = useState<'loading' | 'ready' | 'none'>('loading');
+  const [lyricsLoading, setLyricsLoading] = useState(true);
   const [showSleep, setShowSleep] = useState(false);
   const [showSpeed, setShowSpeed] = useState(false);
 
   const art = song?.thumbnailUrl ?? null;
+  const trackKey = song?.videoId ?? '';
+
+  // A provider-sheet find is handed over through this event.
+  useEffect(() => {
+    const onExternal = (e: Event) => {
+      const detail = (e as CustomEvent<Lyrics>).detail;
+      if (detail && typeof detail === 'object' && 'lines' in detail) {
+        setLyrics(detail);
+        setLyricsLoading(false);
+      }
+    };
+    window.addEventListener('bitchord:lyrics', onExternal);
+    return () => window.removeEventListener('bitchord:lyrics', onExternal);
+  }, []);
 
   useEffect(() => {
     setLyrics(null);
-    setLyricsState('loading');
+    setLyricsLoading(true);
     if (!song) return;
     let cancelled = false;
-    extractPalette(art ?? '').then((p) => {
-      if (cancelled) return;
-      setPalette(p ?? fallbackPalette);
-    });
     if (app.settings.syncedLyrics) {
       fetchLyrics(song, playerState.durationMs)
         .then((l) => {
           if (cancelled) return;
           setLyrics(l);
-          setLyricsState(l ? 'ready' : 'none');
+          setLyricsLoading(false);
         })
-        .catch(() => !cancelled && setLyricsState('none'));
+        .catch(() => {
+          if (!cancelled) setLyricsLoading(false);
+        });
     } else {
-      setLyricsState('none');
+      setLyricsLoading(false);
     }
     return () => {
       cancelled = true;
@@ -80,10 +90,10 @@ export function NowPlaying() {
   const busy = playerState.loading;
   const liked = app.liked.some((s) => s.videoId === song.videoId);
 
-  const gradient = `linear-gradient(160deg, rgb(${palette.r} ${palette.g} ${palette.b}) 0%, rgb(${Math.round(palette.r * 0.4)} ${Math.round(palette.g * 0.4)} ${Math.round(palette.b * 0.4)}) 55%, #000 100%)`;
-
   return (
-    <div className="now-playing" style={{ background: gradient }}>
+    <div className="now-playing">
+      <MeshBackdrop imageUrl={art} trackKey={trackKey} />
+      <div className="now-playing-content">
       <div className="now-playing-top safe-top">
         <button className="icon-button" onClick={() => actions.setShowNowPlaying(false)} aria-label="Close">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -175,17 +185,26 @@ export function NowPlaying() {
               className="icon-button now-playing-lyrics-button"
               onClick={() => setPage('lyrics')}
               aria-label="Lyrics"
-              style={{ color: lyricsState === 'ready' ? '#fff' : 'rgba(255,255,255,0.5)' }}
+              style={{ color: !lyricsLoading && lyrics ? '#fff' : 'rgba(255,255,255,0.5)' }}
             >
               <LyricsIcon size={20} />
-              {lyricsState === 'ready' && lyrics?.wordSynced && <span className="lyrics-ready-dot" />}
+              {!lyricsLoading && lyrics?.wordSynced && <span className="lyrics-ready-dot" />}
             </button>
           </div>
         </div>
       )}
+      </div>
 
       {page === 'queue' && <QueuePage onBack={() => setPage('player')} />}
-      {page === 'lyrics' && <LyricsPage lyrics={lyrics} onBack={() => setPage('player')} />}
+      {page === 'lyrics' && (
+        <LyricsPage
+          lyrics={lyrics}
+          loading={lyricsLoading}
+          song={song}
+          durationMs={playerState.durationMs}
+          onBack={() => setPage('player')}
+        />
+      )}
 
       {showSleep && <SleepSheet onClose={() => setShowSleep(false)} />}
       {showSpeed && <SpeedSheet onClose={() => setShowSpeed(false)} />}
