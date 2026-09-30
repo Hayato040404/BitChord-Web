@@ -1,0 +1,229 @@
+/* BitChord web — theme.
+ *
+ * Ported from ui/theme/Theme.kt: Apple Music-styled dark/light palettes,
+ * SF Pro Display, heavy tight typography.
+ */
+
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/sf_pro_display_regular.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/sf_pro_display_medium.otf') format('opentype');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/sf_pro_display_semibold.otf') format('opentype');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/sf_pro_display_bold.otf') format('opentype');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/sf_pro_display_heavy.otf') format('opentype');
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root {
+  --bg: #ffffff;
+  --on-bg: #000000;
+  --surface: #f7f7f9;
+  --on-surface: #000000;
+  --surface-variant: #f2f2f7;
+  --on-surface-variant: #6e6e73;
+  --outline: #e5e5ea;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --accent: #fa2d48;
+  color-scheme: light;
+}
+
+:root.dark {
+  --bg: #000000;
+  --on-bg: #ffffff;
+  --surface: #0d0d0f;
+  --on-surface: #ffffff;
+  --surface-variant: #1c1c1e;
+  --on-surface-variant: #8e8e93;
+  --outline: #2c2c2e;
+  --glass: rgba(20, 20, 22, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--on-bg);
+  font-family: 'SF Pro Display', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* ---- typography scale (Theme.kt) ---- */
+
+.display-large {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+.headline-large {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.7px;
+}
+.headline-medium {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.title-large {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.title-medium {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.body-large {
+  font-size: 16px;
+  font-weight: 400;
+}
+.body-medium {
+  font-size: 14px;
+  font-weight: 400;
+}
+.label-medium {
+  font-size: 12px;
+  font-weight: 600;
+}
+.label-small {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ---- utilities ---- */
+
+.page-gutter {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.frosted {
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid var(--glass-border);
+}
+
+.row-art {
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--surface-variant);
+}
+
+/* Scrollbars: thin, only on hover-capable pointers. */
+@media (hover: hover) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--outline);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* Safe areas for installed-PWA chrome. */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Toast / notice animation. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-variant) 25%, var(--outline) 50%, var(--surface-variant) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  border-radius: 50%;
+  border: 2px solid var(--outline);
+  border-top-color: var(--on-bg);
+  animation: spin 0.8s linear infinite;
+}
