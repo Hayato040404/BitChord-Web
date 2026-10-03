@@ -7,10 +7,18 @@
  *    interpolated through every word boundary on the beat. Held notes lift,
  *    swell and glow; see `src/lyrics/sweep.ts`, which is ported from
  *    YTM_Immersion's `lyrics-engine.js`.
+ *  - The panel follows the lead on a critically damped spring, so it can be
+ *    handed a new destination mid-flight without restarting or overshooting;
+ *    see `src/lyrics/scroll.ts`, also ported from the reference. A hand on the
+ *    panel wins for three seconds, then it takes over again.
+ *  - Both of those run off one rAF loop reading the audio element directly —
+ *    `useLyricsClock` — so the sweep is never a frame behind the song. Rows
+ *    only re-render when the sung line changes.
  *  - Words off the lead sit in the app's falloff ladder — alpha [1, .8, .7,
  *    .58, .46] and blur [0, 1, 1, 1.7, 2.4]px indexed by distance — so the
  *    two lines around the playing one stay readable and only past that does
- *    the panel let go.
+ *    the panel let go. Past lines dim rather than vanish; the reference hides
+ *    them, which is not what this app wants.
  *  - Tapping any line seeks to it (the app's onSeekToLine), a row under a
  *    finger dips, and the active row scales up from 0.98.
  *  - Instrumental breaks are three dots that fill left to right across the
@@ -20,12 +28,13 @@
  *    toolbar; everything re-fetches live.
  */
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, MutableRefObject } from 'react';
 import { player } from '../player/player';
-import { usePlayer } from '../state/store';
 import { activeLineIndex, isGap } from '../lyrics/lyrics';
 import type { Lyrics, LyricLine } from '../lyrics/lyrics';
 import { buildLyricRowModel, bindRow, invalidateRow, invalidateRows, paintRow, releaseRow } from '../lyrics/sweep';
+import { createLyricScroll } from '../lyrics/scroll';
 import { fetchLyrics } from '../lyrics/providers';
 import type { Song } from '../api/models';
 
@@ -42,32 +51,109 @@ function isSectionHeader(text: string): boolean {
 }
 
 /**
- * Drives the karaoke off rAF, carried forward from the player's coarser
- * reports (the app's rememberLyricClock idea: advance on the frame clock
- * between reports, resync whenever a report lands).
+ * Drives the karaoke off one rAF loop that reads the audio element directly.
+ *
+ * Deliberately not routed through React state. Two reasons:
+ *
+ *  - Accuracy. `player.positionMs` is only reported four times a second, and a
+ *    state update per frame puts a render between the clock and the paint. The
+ *    lyrics ended up sitting behind the song. Reading `audio.currentTime`
+ *    inside the frame that draws removes both gaps.
+ *  - Cost. Fifty-odd rows re-rendering sixty times a second to move a gradient
+ *    is a lot of work for nothing. The rows only re-render when the sung line
+ *    changes; everything per-frame is written straight to the DOM.
  */
-function useSmoothPosition(synced: boolean): number {
-  const playerState = usePlayer();
-  const [smooth, setSmooth] = useState(playerState.positionMs);
-  const playing = playerState.playing;
-  const reported = playerState.positionMs;
+interface LyricsClockOptions {
+  enabled: boolean;
+  lines: LyricLine[];
+  offsetMs: number;
+  rows: MutableRefObject<Map<number, HTMLDivElement>>;
+  container: MutableRefObject<HTMLDivElement | null>;
+  onIndex: (index: number) => void;
+  /** Re-arms the instant first scroll whenever this changes. */
+  resetKey: unknown;
+}
+
+function useLyricsClock({
+  enabled,
+  lines,
+  offsetMs,
+  rows,
+  container,
+  onIndex,
+  resetKey,
+}: LyricsClockOptions): void {
+  // Read through refs so the loop never has to be torn down and rebuilt.
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
+  const offsetRef = useRef(offsetMs);
+  offsetRef.current = offsetMs;
+  const onIndexRef = useRef(onIndex);
+  onIndexRef.current = onIndex;
+  const instantRef = useRef(true);
 
   useEffect(() => {
-    if (!synced || !playing) {
-      setSmooth(reported);
-      return;
-    }
-    let raf = 0;
-    const tick = () => {
-      const audioMs = player.currentAudioTimeMs();
-      setSmooth(audioMs ?? reported);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [synced, playing, reported]);
+    const el = container.current;
+    if (!enabled || !el) return;
 
-  return synced && playing ? smooth : reported;
+    const scroller = createLyricScroll(el);
+    instantRef.current = true;
+    let raf = 0;
+    let last = 0;
+    let current = -2;
+
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+      last = now;
+
+      const raw = player.currentAudioTimeMs() ?? player.getSnapshot().positionMs;
+      const t = Math.max(0, raw - offsetRef.current);
+      const list = linesRef.current;
+      const index = activeLineIndex(list, t);
+
+      if (index !== current) {
+        if (current >= 0) {
+          const previous = rows.current.get(current);
+          if (previous) releaseRow(previous);
+        }
+        current = index;
+        onIndexRef.current(index);
+
+        const next = index >= 0 ? rows.current.get(index) : null;
+        // A hand on the panel wins for a few seconds; then it takes over again.
+        if (next && !scroller.isUserScrolling()) {
+          scroller.scrollToRow(next, instantRef.current);
+          instantRef.current = false;
+        }
+      }
+
+      if (index >= 0) {
+        const row = rows.current.get(index);
+        const line = list[index];
+        if (row && line) {
+          if (isGap(line)) {
+            // Instrumental break: the dots fill across the silence.
+            const nextAt = list[index + 1]?.at ?? line.at;
+            const span = Math.max(1, nextAt - line.at);
+            const through = Math.max(0, Math.min(1, (t - line.at) / span));
+            row.style.setProperty('--gap-through', through.toFixed(3));
+          } else {
+            paintRow(row, t / 1000);
+          }
+        }
+      }
+
+      scroller.step(dt);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      scroller.reset();
+      onIndexRef.current(-1);
+    };
+  }, [enabled, resetKey, container, rows]);
 }
 
 interface LyricsPageProps {
@@ -79,32 +165,34 @@ interface LyricsPageProps {
 }
 
 export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: LyricsPageProps) {
-  const positionMs = useSmoothPosition(lyrics?.synced === true);
   const [offsetMs, setOffsetMs] = useState(0);
-  const adjusted = Math.max(0, positionMs - offsetMs);
-  const activeIndex = useMemo(
-    () => (lyrics?.synced ? activeLineIndex(lyrics.lines, adjusted) : -1),
-    [lyrics, adjusted],
-  );
-  const activeRef = useRef<HTMLDivElement | null>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  const [, setLayoutRev] = useState(0);
+  const rowsRef = useRef(new Map<number, HTMLDivElement>());
   const [sheet, setSheet] = useState<'none' | 'offset' | 'provider'>('none');
 
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [activeIndex]);
+  const registerRow = useCallback((index: number, el: HTMLDivElement | null) => {
+    if (el) rowsRef.current.set(index, el);
+    else rowsRef.current.delete(index);
+  }, []);
+
+  useLyricsClock({
+    enabled: lyrics?.synced === true,
+    lines: lyrics?.lines ?? [],
+    offsetMs,
+    rows: rowsRef,
+    container: bodyRef,
+    onIndex: setActiveIndex,
+    resetKey: lyrics,
+  });
 
   // The word-sync sweep works in pixels read off the laid-out line, so those
   // measurements only hold for the layout they were taken from. A late font
-  // load or a resize invalidates them all; the bump re-renders, which repaints.
+  // load or a resize invalidates them all; the clock re-measures the sung line
+  // on its next frame, so nothing else has to happen here.
   useEffect(() => {
-    const refresh = () => {
-      invalidateRows(bodyRef.current);
-      setLayoutRev((rev) => rev + 1);
-    };
-    const onResize = () => refresh();
-    window.addEventListener('resize', onResize);
+    const refresh = () => invalidateRows(bodyRef.current);
+    window.addEventListener('resize', refresh);
     let cancelled = false;
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     fonts?.ready.then(() => {
@@ -112,7 +200,7 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
     });
     return () => {
       cancelled = true;
-      window.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', refresh);
     };
   }, [lyrics]);
 
@@ -180,11 +268,9 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
                 <LyricRow
                   key={i}
                   line={line}
-                  lines={lyrics.lines}
                   index={i}
                   activeIndex={activeIndex}
-                  positionMs={adjusted}
-                  activeRef={i === activeIndex ? (el) => { activeRef.current = el; } : undefined}
+                  register={registerRow}
                   onTap={() => seekToLine(line)}
                 />
               ))
@@ -432,21 +518,17 @@ function ProviderSheet({
   );
 }
 
-function LyricRow({
+const LyricRow = memo(function LyricRow({
   line,
-  lines,
   index,
   activeIndex,
-  positionMs,
-  activeRef,
+  register,
   onTap,
 }: {
   line: LyricLine;
-  lines: LyricLine[];
   index: number;
   activeIndex: number;
-  positionMs: number;
-  activeRef?: (el: HTMLDivElement | null) => void;
+  register: (index: number, el: HTMLDivElement | null) => void;
   onTap: () => void;
 }) {
   const [pressed, setPressed] = useState(false);
@@ -463,43 +545,37 @@ function LyricRow({
   const setRow = useCallback(
     (el: HTMLDivElement | null) => {
       rowRef.current = el;
-      activeRef?.(el);
     },
-    [activeRef],
+    [],
   );
 
-  // Pair the rendered words with the units they came from. Cheap on every
-  // commit — the engine only redoes work when the words or their timing move.
+  // Pair the rendered words with the units they came from, and hand the
+  // element to the clock that paints it. Cheap on every commit — the engine
+  // only redoes work when the words or their timing move.
   useLayoutEffect(() => {
     const el = rowRef.current;
-    if (!el || !model) return;
-    bindRow(el, model);
-    boundRef.current = el;
-  });
-
-  // Drive the wavefront. This runs before paint, every frame the page renders,
-  // so the sweep stays locked to the audio clock.
-  useLayoutEffect(() => {
-    const el = rowRef.current;
-    if (!el || !model) return;
-    if (active) paintRow(el, positionMs / 1000);
-    else releaseRow(el);
+    if (!el) return;
+    register(index, el);
+    if (model) {
+      bindRow(el, model);
+      boundRef.current = el;
+    }
   });
 
   // Let the compositor drop the animations when the line unmounts.
   useEffect(
     () => () => {
+      register(index, null);
       if (boundRef.current) invalidateRow(boundRef.current);
     },
-    [],
+    [index, register],
   );
 
   if (isGap(line)) {
     // The break: three dots that fill left to right across the interlude, and
     // a row that only opens while the break is playing (the app's swell).
-    const nextAt = lines[index + 1]?.at ?? line.at;
-    const span = Math.max(1, nextAt - line.at);
-    const through = Math.max(0, Math.min(1, (positionMs - line.at) / span));
+    // `--gap-through` is written by the clock, not by React, so the dots stay
+    // on the audio without re-rendering this row every frame.
     return (
       <div
         className={`lyric-gap${active ? ' lyric-gap-active' : ''}`}
@@ -509,18 +585,9 @@ function LyricRow({
         tabIndex={-1}
         aria-label="Instrumental"
       >
-        {[0, 1, 2].map((dot) => {
-          const lit = Math.max(0, Math.min(1, through * 3 - dot));
-          return (
-            <span
-              key={dot}
-              style={{
-                opacity: 0.25 + 0.75 * lit,
-                transform: `scale(${0.76 + 0.24 * lit})`,
-              }}
-            />
-          );
-        })}
+        {[0, 1, 2].map((dot) => (
+          <span key={dot} style={{ '--dot': dot } as CSSProperties} />
+        ))}
       </div>
     );
   }
@@ -605,4 +672,4 @@ function LyricRow({
       {background && <span className="lyric-background">({background.text})</span>}
     </div>
   );
-}
+});

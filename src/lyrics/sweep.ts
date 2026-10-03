@@ -40,7 +40,11 @@ const SWEEP_STEP = 32;
 const MOTION_FRAME_MS = 40;
 const MOTION_MIN_FRAMES = 8;
 const MOTION_MAX_FRAMES = 40;
-const MOTION_RESYNC_SEC = 0.08;
+// The lift is a composited transform, so between our own frames the browser
+// runs it on its own clock. Keep the two within a frame of each other — the
+// reference allowed 80ms here, which is five frames and reads as the word
+// rising late.
+const MOTION_RESYNC_SEC = 0.016;
 
 const bellCurve = (x: number): number =>
   x <= 0 || x >= 1 ? 0 : 0.5 - 0.5 * Math.cos(2 * Math.PI * x);
@@ -347,7 +351,6 @@ interface RowState {
   sweepIndex: number;
   sweepReady: boolean;
   motionReady: boolean;
-  sweepAnimated: boolean;
   motions: Animation[] | null;
   motionOrigin: number;
   motionSyncedAt: number | undefined;
@@ -581,50 +584,6 @@ const buildWordKeyframes = (meta: WordMeta, origin: number) => {
   return { frames, delay: (meta.empStart - origin) * 1000, duration: meta.empDur * 1000 };
 };
 
-/**
- * The wavefront as keyframes too. The Hermite curve between two nodes is a
- * cubic bezier, so the browser gets the same path the fallback interpolation
- * would have produced — but interpolated on its own clock.
- */
-const buildSweepKeyframes = (state: RowState) => {
-  const ts = state.sweepT;
-  const xs = state.sweepX;
-  const ms = state.sweepM;
-  if (!ts || !xs || ts.length < 2) return null;
-
-  const from = ts[0];
-  const total = ts[ts.length - 1] - from;
-  if (!(total > 0)) return null;
-
-  const frames: Keyframe[] = [];
-  for (let i = 0; i < ts.length; i++) {
-    const offset = (ts[i] - from) / total;
-    if (frames.length && offset <= frames[frames.length - 1].offset!) continue;
-    const frame: Keyframe & { easing?: string } = {
-      offset: Math.min(1, Math.max(0, offset)),
-      '--sweep': xs[i].toFixed(2),
-    };
-
-    if (i < ts.length - 1 && ms) {
-      const h = ts[i + 1] - ts[i];
-      const dx = xs[i + 1] - xs[i];
-      if (h > 0 && dx > 0) {
-        const y1 = Math.min(1, Math.max(0, (ms[i] * h) / (3 * dx)));
-        const y2 = Math.min(1, Math.max(0, 1 - (ms[i + 1] * h) / (3 * dx)));
-        frame.easing = `cubic-bezier(0.3333, ${y1.toFixed(4)}, 0.6667, ${y2.toFixed(4)})`;
-      } else {
-        frame.easing = 'linear';
-      }
-    }
-    frames.push(frame);
-  }
-
-  if (frames.length < 2) return null;
-  frames[0].offset = 0;
-  frames[frames.length - 1].offset = 1;
-  return { frames, from, duration: total * 1000 };
-};
-
 const createRowMotion = (row: HTMLElement, state: RowState): void => {
   state.motionReady = true;
   if (state.words.length === 0) return;
@@ -637,25 +596,6 @@ const createRowMotion = (row: HTMLElement, state: RowState): void => {
   state.motionOrigin = origin;
 
   const animations: Animation[] = [];
-
-  const sweep = buildSweepKeyframes(state);
-  if (sweep && typeof row.animate === 'function') {
-    try {
-      const animation = row.animate(sweep.frames as Keyframe[], {
-        duration: sweep.duration,
-        delay: (sweep.from - origin) * 1000,
-        fill: 'both',
-        easing: 'linear',
-      });
-      animation.pause();
-      animations.push(animation);
-      state.sweepAnimated = true;
-    } catch {
-      state.sweepAnimated = false;
-    }
-  } else {
-    state.sweepAnimated = false;
-  }
 
   state.words.forEach((span, index) => {
     const meta = state.meta[index];
@@ -772,7 +712,6 @@ export function bindRow(row: HTMLElement, model: LyricRowModel): void {
       sweepIndex: 0,
       sweepReady: false,
       motionReady: false,
-      sweepAnimated: false,
       motions: null,
       motionOrigin: 0,
       motionSyncedAt: undefined,
@@ -803,7 +742,16 @@ export function bindRow(row: HTMLElement, model: LyricRowModel): void {
   }
 }
 
-/** Paints the active line at [t] seconds. */
+/**
+ * Paints the active line at [t] seconds.
+ *
+ * Call this once per frame with a time read straight off the audio clock. The
+ * wavefront is written here rather than handed to a Web Animations keyframe
+ * animation (as the reference does) because such an animation advances on its
+ * own clock and only gets corrected once it has drifted past its tolerance —
+ * which is what made the lyrics sit behind the song. `--sweep` feeds a paint
+ * property, so the compositor never got us anything by handing it over.
+ */
 export function paintRow(row: HTMLElement, t: number): void {
   const state = stateFor(row);
   if (!state) return;
@@ -811,14 +759,10 @@ export function paintRow(row: HTMLElement, t: number): void {
   if (!state.motionReady) createRowMotion(row, state);
   syncRowMotion(row, state, t, 1);
 
-  // The wavefront rides a keyframe animation when we could build one; writing
-  // the variable by hand is the fallback for when we could not.
-  if (!state.sweepAnimated) {
-    writeVar(row, '--sweep', '__sweep', lyricSweepAt(row, t), SWEEP_STEP);
-  }
+  writeVar(row, '--sweep', '__sweep', lyricSweepAt(row, t), SWEEP_STEP);
 
-  // The glow is not in the keyframes — it is a paint-level effect, so it is
-  // written every frame, quantised so we are not thrashing the style engine.
+  // The glow is a paint-level effect too, so it is written every frame as
+  // well, quantised so we are not thrashing the style engine.
   state.words.forEach((span, index) => {
     const meta = state.meta[index];
     if (!meta || !meta.glow || meta.start === null) return;
@@ -832,7 +776,7 @@ export function releaseRow(row: HTMLElement): void {
   const state = stateFor(row);
   if (!state) return;
   stopRowMotion(state);
-  if (!state.sweepAnimated) writeVar(row, '--sweep', '__sweep', 0, SWEEP_STEP);
+  writeVar(row, '--sweep', '__sweep', 0, SWEEP_STEP);
   state.sweepIndex = 0;
   for (const span of state.words) {
     writeVar(span, '--wg', '__wg', 0, WORD_STEP);
@@ -859,7 +803,6 @@ export function invalidateRow(row: HTMLElement): void {
     }
     state.motions = null;
   }
-  state.sweepAnimated = false;
   state.sweepT = null;
   state.sweepX = null;
   state.sweepM = null;

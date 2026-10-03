@@ -937,9 +937,11 @@
   border-radius: 50%;
   background: #fff;
   flex: none;
-  transition: opacity 0.2s linear, transform 0.2s ease;
-  opacity: 0.25;
-  transform: scale(0.76);
+  /* The clock writes --gap-through every frame, so there is no transition
+     here: adding one would only put ~200ms between the dots and the audio. */
+  --lit: clamp(0, calc(var(--gap-through, 0) * 3 - var(--dot, 0)), 1);
+  opacity: calc(0.25 + 0.75 * var(--lit));
+  transform: scale(calc(0.76 + 0.24 * var(--lit)));
 }
 
 /* Lyrics chrome: offset note, section chips, skeleton, provider link. */
