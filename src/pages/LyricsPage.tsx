@@ -3,8 +3,10 @@
  *
  * The full PlayerLyrics port. The reading experience:
  *
- *  - The sung line sweeps in per-word gradients (see the previous pass), the
- *    edge feathered so it reads as a wavefront rather than a bar.
+ *  - The sung line carries a single wavefront, measured in pixels and
+ *    interpolated through every word boundary on the beat. Held notes lift,
+ *    swell and glow; see `src/lyrics/sweep.ts`, which is ported from
+ *    YTM_Immersion's `lyrics-engine.js`.
  *  - Words off the lead sit in the app's falloff ladder — alpha [1, .8, .7,
  *    .58, .46] and blur [0, 1, 1, 1.7, 2.4]px indexed by distance — so the
  *    two lines around the playing one stay readable and only past that does
@@ -18,17 +20,12 @@
  *    toolbar; everything re-fetches live.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { player } from '../player/player';
 import { usePlayer } from '../state/store';
-import {
-  activeLineIndex,
-  isGap,
-  lineEnd,
-  wordLift,
-  wordSpans,
-} from '../lyrics/lyrics';
+import { activeLineIndex, isGap } from '../lyrics/lyrics';
 import type { Lyrics, LyricLine } from '../lyrics/lyrics';
+import { buildLyricRowModel, bindRow, invalidateRow, invalidateRows, paintRow, releaseRow } from '../lyrics/sweep';
 import { fetchLyrics } from '../lyrics/providers';
 import type { Song } from '../api/models';
 
@@ -90,11 +87,34 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
     [lyrics, adjusted],
   );
   const activeRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [, setLayoutRev] = useState(0);
   const [sheet, setSheet] = useState<'none' | 'offset' | 'provider'>('none');
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [activeIndex]);
+
+  // The word-sync sweep works in pixels read off the laid-out line, so those
+  // measurements only hold for the layout they were taken from. A late font
+  // load or a resize invalidates them all; the bump re-renders, which repaints.
+  useEffect(() => {
+    const refresh = () => {
+      invalidateRows(bodyRef.current);
+      setLayoutRev((rev) => rev + 1);
+    };
+    const onResize = () => refresh();
+    window.addEventListener('resize', onResize);
+    let cancelled = false;
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
+    fonts?.ready.then(() => {
+      if (!cancelled) refresh();
+    });
+    return () => {
+      cancelled = true;
+      window.removeEventListener('resize', onResize);
+    };
+  }, [lyrics]);
 
   const seekToLine = (line: LyricLine) => {
     if (!lyrics?.synced) return;
@@ -151,7 +171,10 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
           onFound={() => setSheet('none')}
         />
       ) : (
-        <div className={`lyrics-body${lyrics.synced ? ' lyrics-body-synced' : ''}`}>
+        <div
+          className={`lyrics-body${lyrics.synced ? ' lyrics-body-synced' : ''}`}
+          ref={bodyRef}
+        >
           {lyrics.synced
             ? lyrics.lines.map((line, i) => (
                 <LyricRow
@@ -432,6 +455,45 @@ function LyricRow({
   const distance = Math.min(4, Math.abs(index - activeIndex));
   const background = line.background;
 
+  // The word-sync model: words re-split with Intl.Segmenter, grouped into
+  // phrases the line is allowed to wrap between. Null on line-synced providers.
+  const model = useMemo(() => buildLyricRowModel(line), [line]);
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const boundRef = useRef<HTMLDivElement | null>(null);
+  const setRow = useCallback(
+    (el: HTMLDivElement | null) => {
+      rowRef.current = el;
+      activeRef?.(el);
+    },
+    [activeRef],
+  );
+
+  // Pair the rendered words with the units they came from. Cheap on every
+  // commit — the engine only redoes work when the words or their timing move.
+  useLayoutEffect(() => {
+    const el = rowRef.current;
+    if (!el || !model) return;
+    bindRow(el, model);
+    boundRef.current = el;
+  });
+
+  // Drive the wavefront. This runs before paint, every frame the page renders,
+  // so the sweep stays locked to the audio clock.
+  useLayoutEffect(() => {
+    const el = rowRef.current;
+    if (!el || !model) return;
+    if (active) paintRow(el, positionMs / 1000);
+    else releaseRow(el);
+  });
+
+  // Let the compositor drop the animations when the line unmounts.
+  useEffect(
+    () => () => {
+      if (boundRef.current) invalidateRow(boundRef.current);
+    },
+    [],
+  );
+
   if (isGap(line)) {
     // The break: three dots that fill left to right across the interlude, and
     // a row that only opens while the break is playing (the app's swell).
@@ -441,7 +503,7 @@ function LyricRow({
     return (
       <div
         className={`lyric-gap${active ? ' lyric-gap-active' : ''}`}
-        ref={activeRef}
+        ref={setRow}
         onClick={onTap}
         role="button"
         tabIndex={-1}
@@ -489,10 +551,10 @@ function LyricRow({
     onTap();
   };
 
-  if (line.words.length === 0 || !active) {
+  if (!model) {
     return (
       <div
-        ref={activeRef}
+        ref={setRow}
         className={lineClass}
         style={style}
         onClick={seek}
@@ -508,63 +570,15 @@ function LyricRow({
     );
   }
 
-  // The sung line: every word carries a gradient whose lit edge travels
-  // through it. The edge is feathered by easing the colour stop in — a hard
-  // boundary reads as a bar, the feather reads as a wavefront.
-  const spans = wordSpans(line);
-  const words = line.words;
-  const parts: React.ReactNode[] = [];
-  let cursor = 0;
-  for (let i = 0; i < words.length; i++) {
-    const [start, end] = spans[i];
-    if (start > cursor) {
-      parts.push(
-        <span key={`s${i}`} className="lyric-plain">
-          {line.text.slice(cursor, start)}
-        </span>,
-      );
-    }
-    const lift = wordLift(line, i, positionMs);
-    const wordStart = words[i].startMs;
-    const wordEnd = words[i].endMs;
-    let through: number;
-    if (positionMs <= wordStart) through = 0;
-    else if (positionMs >= wordEnd) through = 1;
-    else through = (positionMs - wordStart) / Math.max(1, wordEnd - wordStart);
-    const transform = lift > 0 ? `translateY(${(-lift * 0.1).toFixed(4)}em)` : undefined;
-    // Feather: the stop pair straddles the reveal point by ~18% of the word,
-    // so the cut between lit and unlit ink is a ramp.
-    const feather = Math.max(4, (end - start) * 0.18);
-    const pct = (v: number) => (v * 100).toFixed(1);
-    const wordStyle: React.CSSProperties =
-      through >= 1
-        ? { color: '#fff', transform }
-        : through <= 0
-          ? { color: 'rgba(255,255,255,0.28)', transform }
-          : {
-              color: 'transparent',
-              transform,
-              backgroundImage: `linear-gradient(90deg, #fff 0%, #fff ${pct(Math.max(0, through - feather / (end - start)))}%, rgba(255,255,255,0.28) ${pct(Math.min(1, through + feather / (end - start)))}%, rgba(255,255,255,0.28) 100%)`,
-            };
-    parts.push(
-      <span key={`w${i}`} className="lyric-word" style={wordStyle}>
-        {line.text.slice(start, end)}
-      </span>,
-    );
-    cursor = end;
-  }
-  if (cursor < line.text.length) {
-    parts.push(
-      <span key="tail" className="lyric-plain" style={{ color: 'rgba(255,255,255,0.28)' }}>
-        {line.text.slice(cursor)}
-      </span>,
-    );
-  }
-
+  // A word-synced line. The structure is built for every line, not just the
+  // sung one, so a line does not reflow at the moment it takes the lead — the
+  // wavefront's pixel positions would all be wrong. The words carry no inline
+  // colour: the sweep is one gradient across the whole line, and the engine
+  // feeds it `--sweep`, `--wx` and the per-word glow.
   return (
     <div
-      ref={activeRef}
-      className={`${lineClass} lyric-swept`}
+      ref={setRow}
+      className={`${lineClass} lyric-swept ytm-word-sync`}
       style={style}
       onClick={seek}
       onPointerDown={() => setPressed(true)}
@@ -573,7 +587,21 @@ function LyricRow({
       role="button"
       tabIndex={-1}
     >
-      {parts}
+      <span className="lyric-main">
+        {model.phrases.map((phrase, phraseIndex) => (
+          <span key={phraseIndex} className="lyric-phrase lyric-phrase-sync">
+            {phrase.map((unit, unitIndex) =>
+              unit.type === 'space' ? (
+                <Fragment key={unitIndex}>{unit.text}</Fragment>
+              ) : (
+                <span key={unitIndex} className="lyric-word">
+                  {unit.text}
+                </span>
+              ),
+            )}
+          </span>
+        ))}
+      </span>
       {background && <span className="lyric-background">({background.text})</span>}
     </div>
   );

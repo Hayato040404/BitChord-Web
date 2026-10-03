@@ -785,20 +785,88 @@
   margin-top: 6px;
 }
 
-/* The sung line: the gradient lives inside each word's glyphs. */
+/* The sung line: the wavefront lives in a px-accurate gradient across the
+   whole line, driven by the engine in src/lyrics/sweep.ts.
+
+   What the engine writes:
+     on the line   --sweep   px from the start of the line the wavefront has reached
+                   --feather half-width of the wavefront's soft edge, px
+     on each word  --wx      px from the start of the line where that word begins
+                   --wg      glow strength 0..1 — only a held note ever gets one
+                   --wglowa  the glow's peak opacity
+                   --wglowr  the glow's radius, in em
+
+   The lift and the swell are NOT here: the engine hands those to the Web
+   Animations API as keyframes so the compositor owns them, and writing
+   `transform` from CSS would fight it. */
+@property --sweep {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 .lyric-swept {
   position: relative;
 }
+.lyric-main {
+  display: block;
+  width: 100%;
+}
+.lyric-phrase {
+  display: inline;
+}
+.lyric-phrase-sync {
+  margin: 0;
+}
+.lyric-line.ytm-word-sync {
+  position: relative;
+  --sweep: 0;
+  --feather: 10;
+  --ytm-rest-alpha: 0.26;
+}
+.lyric-line.ytm-word-sync.lyric-active {
+  --ytm-rest-alpha: 0.4;
+}
 .lyric-word {
   display: inline-block;
+  white-space: pre;
+  transform-origin: 50% 78%;
   will-change: transform;
-  /* Filled by the inline background-image + color:transparent. */
-  background-clip: text;
-  -webkit-background-clip: text;
+  --wx: 0;
+  --feather: 10;
+  --wg: 0;
+  --wglowa: 0;
+  --wglowr: 0;
 }
-.lyric-word-done {
-  color: #fff;
-  background: none;
+
+/* The wavefront. Each word takes the distance between the front and its own
+   start, so the boundary lands in the right place however the line wrapped —
+   and because it is measured in px rather than in characters, the feather is
+   the same width everywhere, including across a word boundary. */
+.lyric-line.ytm-word-sync.lyric-active .lyric-word {
+  background-image: linear-gradient(
+    90deg,
+    currentColor calc((var(--sweep) - var(--wx) - var(--feather)) * 1px),
+    color-mix(in srgb, currentColor calc(var(--ytm-rest-alpha) * 100%), transparent)
+      calc((var(--sweep) - var(--wx) + var(--feather)) * 1px)
+  );
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 calc(var(--wglowr) * 1em)
+    color-mix(
+      in srgb,
+      color-mix(in srgb, currentColor 55%, #fff) calc(var(--wg) * var(--wglowa) * 100%),
+      transparent
+    );
+}
+
+/* Off the lead, a word is plain text again. */
+.lyric-line.ytm-word-sync:not(.lyric-active) .lyric-word {
+  background-image: none;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none;
 }
 .lyric-plain {
   display: inline;
