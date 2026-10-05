@@ -69,6 +69,13 @@ tops out at the best progressive audio an instance can hand a browser
 UI for adding private instances are the same "pluggable sources" design —
 a self-hosted Piped/Invidious gives the most reliable playback.
 
+## Used AI models
+
+This web port was built with:
+
+- GLM5.3 flash max
+- Space bunny Alpha high
+
 ## License
 
 GPL v3, like BitChord itself. Not affiliated with YouTube or Google.
