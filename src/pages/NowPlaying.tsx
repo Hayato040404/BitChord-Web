@@ -15,7 +15,7 @@ import { formatDuration } from '../api/models';
 import { MeshBackdrop } from '../components/MeshBackdrop';
 import { fetchLyrics } from '../lyrics/providers';
 import type { Lyrics } from '../lyrics/lyrics';
-import { LyricsPage } from './LyricsPage';
+import { LyricsPage, getSavedLyricsMeta } from './LyricsPage';
 import { SmartArt } from '../components/SmartArt';
 import { SongRow } from '../components/SongRow';
 import {
@@ -66,7 +66,21 @@ export function NowPlaying() {
     if (!song) return;
     let cancelled = false;
     if (app.settings.syncedLyrics) {
-      fetchLyrics(song, playerState.durationMs)
+      fetchLyrics(
+        song,
+        playerState.durationMs,
+        (() => {
+          const saved = getSavedLyricsMeta(song.videoId);
+          if (!saved) return undefined;
+          const title = saved.manualTitle.trim();
+          const artist = saved.manualArtist.trim();
+          if (!title && !artist) return undefined;
+          return {
+            title: title,
+            artist: artist,
+          };
+        })(),
+      )
         .then((l) => {
           if (cancelled) return;
           setLyrics(l);
