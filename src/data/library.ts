@@ -39,6 +39,7 @@ const K_PLAYLISTS = 'bitchord.playlists';
 const K_HISTORY = 'bitchord.history';
 const K_RECENTS = 'bitchord.recents';
 const K_SETTINGS = 'bitchord.settings';
+const K_LYRICS_BY_SONG = 'bitchord.lyricsBySong';
 
 // ---- settings ----------------------------------------------------------------
 
@@ -51,6 +52,19 @@ export interface Settings {
   playbackSpeed: number;
   sources: StreamSource[];
   dataSaver: boolean;
+  /** 曲ごと(per-song)に保存した歌詞タイミングと手動タイトル/アーティスト。
+   *  key = videoId。
+   */
+  lyricsBySong: Record<string, LyricsBySong>;
+}
+
+export interface LyricsBySong {
+  /** ユーザーが確定した歌詞の時間オフセット(ms)。 */
+  offsetMs: number;
+  /** 手動歌詞検索で最後に成功したときのタイトル。 */
+  manualTitle: string;
+  /** 手動歌詞検索で最後に成功したときにの使用アーティスト。 */
+  manualArtist: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -62,17 +76,58 @@ export const DEFAULT_SETTINGS: Settings = {
   playbackSpeed: 1,
   sources: [],
   dataSaver: false,
+  lyricsBySong: {},
 };
 
 export function loadSettings(): Settings {
   const stored = load<Partial<Settings>>(K_SETTINGS, {});
   const sources = stored.sources !== undefined ? stored.sources : loadSources();
-  return { ...DEFAULT_SETTINGS, ...stored, sources };
+  const lyricsBySong = stored.lyricsBySong !== undefined
+    ? stored.lyricsBySong
+    : loadLyricsBySong();
+  return { ...DEFAULT_SETTINGS, ...stored, sources, lyricsBySong };
 }
 
 export function saveSettings(settings: Settings): void {
   save(K_SETTINGS, settings);
   saveSources(settings.sources);
+  saveLyricsBySong(settings.lyricsBySong);
+}
+
+/** 曲ごとの歌詞メタは設定本体とは別に保管する(大きくなり得るため)。 */
+function loadLyricsBySong(): Record<string, LyricsBySong> {
+  return load<Record<string, LyricsBySong>>(K_LYRICS_BY_SONG, {});
+}
+
+function saveLyricsBySong(value: Record<string, LyricsBySong>): void {
+  save(K_LYRICS_BY_SONG, value);
+}
+
+/** ある曲の保存済み歌詞メタを更新する。未指定の項目は既存値を保持する。 */
+export function saveLyricsBySongEntry(
+  videoId: string,
+  patch: Partial<LyricsBySong>,
+): void {
+  try {
+    const current = loadLyricsBySong();
+    const existing = current[videoId];
+    current[videoId] = { ...existing, ...patch };
+    saveLyricsBySong(current);
+  } catch {
+    /* private mode などでは保存を諦める */
+  }
+}
+
+/** 指定曲の保存済み歌詞メタを丸ごと消す（次回使用時に自動復元されなくなる）。 */
+export function clearLyricsBySongEntry(videoId: string): void {
+  try {
+    const current = loadLyricsBySong();
+    if (!current[videoId]) return;
+    delete current[videoId];
+    saveLyricsBySong(current);
+  } catch {
+    /* private mode などでは諦める */
+  }
 }
 
 // ---- library records -----------------------------------------------------------

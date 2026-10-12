@@ -713,10 +713,11 @@ async function fromLrclib(song: Song, durationMs: number): Promise<Lyrics | null
 
 // ---- entry point ---------------------------------------------------------------
 
-/** User-entered title/artist, for when the automatic match finds nothing. */
+/** User-entered title/artist, for when the automatic match finds nothing.
+ * どちらか片方だけ上書きしたい場合もあるので、オプショナルにする。 */
 export interface LyricOverride {
-  title: string;
-  artist: string;
+  title?: string;
+  artist?: string;
 }
 
 /** How heavily a result's word-level timing weighs in the pick. */

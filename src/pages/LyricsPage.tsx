@@ -37,6 +37,38 @@ import { buildLyricRowModel, bindRow, invalidateRow, invalidateRows, paintRow, r
 import { createLyricScroll } from '../lyrics/scroll';
 import { fetchLyrics } from '../lyrics/providers';
 import type { Song } from '../api/models';
+import { saveLyricsBySongEntry, clearLyricsBySongEntry } from '../data/library';
+
+export function getSavedLyricsMeta(videoId: string): { offsetMs: number; manualTitle: string; manualArtist: string } | null {
+  try {
+    const raw = window.localStorage?.getItem('bitchord.lyricsBySong');
+    if (!raw) return null;
+    const map = JSON.parse(raw) as Record<string, { offsetMs: number; manualTitle: string; manualArtist: string }> | null;
+    if (!map || !Object.prototype.hasOwnProperty.call(map, videoId)) return null;
+    const entry = map[videoId];
+    if (!entry) return null;
+    return {
+      offsetMs: Number.isFinite(entry.offsetMs) ? entry.offsetMs : 0,
+      manualTitle: typeof entry.manualTitle === 'string' ? entry.manualTitle : '',
+      manualArtist: typeof entry.manualArtist === 'string' ? entry.manualArtist : '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** その曲の保存済み歌詞メタにオフsetsを書き込む。 */
+function saveOffsetForSong(videoId: string, offsetMs: number): void {
+  saveLyricsBySongEntry(videoId, { offsetMs });
+}
+
+/** その曲の保存済み歌詞メタに手動検索名を書き込む(検索成功時のみ永久化する)。 */
+function saveManualQueryForSong(videoId: string, title: string, artist: string): void {
+  saveLyricsBySongEntry(videoId, {
+    manualTitle: title.trim(),
+    manualArtist: artist.trim(),
+  });
+}
 
 /** The app's LINE_FALLOFF_ALPHA / LINE_FALLOFF_BLUR, indexed by distance. */
 const FALLOFF_ALPHA = [1, 0.8, 0.7, 0.58, 0.46];
@@ -165,7 +197,11 @@ interface LyricsPageProps {
 }
 
 export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: LyricsPageProps) {
-  const [offsetMs, setOffsetMs] = useState(0);
+  const [offsetMs, setOffsetMs] = useState(() => {
+    // 同じ曲で前回確定した歌詞オフsetsがあればそれを復元する。
+    const saved = getSavedLyricsMeta(song.videoId);
+    return saved?.offsetMs ?? 0;
+  });
   const [activeIndex, setActiveIndex] = useState(-1);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const rowsRef = useRef(new Map<number, HTMLDivElement>());
@@ -293,6 +329,7 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
           offsetMs={offsetMs}
           onChange={(ms) => setOffsetMs(ms)}
           onClose={() => setSheet('none')}
+          videoId={song.videoId}
         />
       )}
       {sheet === 'provider' && (
@@ -333,10 +370,12 @@ function OffsetSheet({
   offsetMs,
   onChange,
   onClose,
+  videoId,
 }: {
   offsetMs: number;
   onChange: (ms: number) => void;
   onClose: () => void;
+  videoId: string;
 }) {
   const [value, setValue] = useState(offsetMs);
   const step = (delta: number) => {
@@ -379,7 +418,24 @@ function OffsetSheet({
           >
             Reset
           </button>
-          <button className="lyrics-manual-button label-medium" onClick={onClose}>
+          <button
+            className="text-button label-medium"
+            onClick={() => {
+              clearLyricsBySongEntry(videoId);
+              setValue(0);
+              onChange(0);
+              onClose();
+            }}
+          >
+            Clear saved
+          </button>
+          <button
+            className="lyrics-manual-button label-medium"
+            onClick={() => {
+              saveOffsetForSong(videoId, offsetMs);
+              onClose();
+            }}
+          >
             Done
           </button>
         </div>
@@ -403,10 +459,11 @@ function ProviderSheet({
   onClose: () => void;
   onFound?: () => void;
 }) {
-  const [title, setTitle] = useState(song.title);
-  const [artist, setArtist] = useState(song.artist);
+  const saved = getSavedLyricsMeta(song.videoId);
+  const [title, setTitle] = useState(saved?.manualTitle || song.title);
+  const [artist, setArtist] = useState(saved?.manualArtist || song.artist);
   const [busy, setBusy] = useState(false);
-  const [found, setFound] = useState<Lyrics | null | null>(null);
+  const [found, setFound] = useState<Lyrics | null>(null);
 
   const search = async () => {
     setBusy(true);
@@ -416,7 +473,11 @@ function ProviderSheet({
         artist: artist.trim() || song.artist,
       });
       setFound(result);
-      if (result) onFound?.();
+      if (result) {
+        onFound?.();
+        // その曲の歌詞探しで成功した名前を次回に自動で使うように記憶する。
+        saveManualQueryForSong(song.videoId, title, artist);
+      }
     } finally {
       setBusy(false);
     }
@@ -432,6 +493,7 @@ function ProviderSheet({
   };
 
   if (embedded && found === null && !busy) {
+    const saved = getSavedLyricsMeta(song.videoId);
     return (
       <div className="lyrics-empty">
         <div className="lyrics-empty-title headline-medium">No lyrics found</div>
@@ -439,6 +501,19 @@ function ProviderSheet({
           The title on YouTube is sometimes not the title on the record. Correct it
           below — the search covers BiniLyrics, PaxSenix, BetterLyrics and LRCLIB.
         </div>
+        {saved && (
+          <button
+            className="text-button label-medium"
+            style={{ marginBottom: 8 }}
+            onClick={() => {
+              clearLyricsBySongEntry(song.videoId);
+              setTitle(song.title);
+              setArtist(song.artist);
+            }}
+          >
+            Clear saved name
+          </button>
+        )}
         <form
           className="lyrics-manual"
           onSubmit={(e) => {
@@ -448,7 +523,7 @@ function ProviderSheet({
         >
           <input
             className="lyrics-manual-input body-medium"
-            value={title}
+            value={saved?.manualTitle || title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Song title"
             aria-label="Song title"
@@ -456,7 +531,7 @@ function ProviderSheet({
           />
           <input
             className="lyrics-manual-input body-medium"
-            value={artist}
+            value={saved?.manualArtist || artist}
             onChange={(e) => setArtist(e.target.value)}
             placeholder="Artist"
             aria-label="Artist"
@@ -484,6 +559,19 @@ function ProviderSheet({
               </button>
             )}
           </div>
+        )}
+        {saved && (
+          <button
+            className="text-button label-medium"
+            style={{ marginBottom: 8 }}
+            onClick={() => {
+              clearLyricsBySongEntry(song.videoId);
+              setTitle(song.title);
+              setArtist(song.artist);
+            }}
+          >
+            Clear saved name
+          </button>
         )}
         <div className="body-medium" style={{ color: 'var(--on-surface-variant)', marginBottom: 10 }}>
           Search all providers with the recording's real name:
