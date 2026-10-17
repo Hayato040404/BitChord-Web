@@ -77,6 +77,7 @@ This web port was built with:
 
 - GLM5.3 flash max
 - Space bunny Alpha high
+- Deepseek V4.1 flash max
 
 ## License
 
