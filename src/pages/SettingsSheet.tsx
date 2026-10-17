@@ -39,18 +39,6 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           </div>
         </SettingsRow>
 
-        <SettingsRow title={`Crossfade — ${settings.crossfadeSeconds}s`}>
-          <input
-            type="range"
-            min={0}
-            max={12}
-            step={1}
-            value={settings.crossfadeSeconds}
-            onChange={(e) => actions.updateSettings({ crossfadeSeconds: Number(e.target.value) })}
-            className="range-input"
-          />
-        </SettingsRow>
-
         <SettingsRow title="Synced lyrics">
           <Toggle
             checked={settings.syncedLyrics}
@@ -63,6 +51,20 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             checked={settings.autoplay}
             onChange={(checked) => actions.updateSettings({ autoplay: checked })}
           />
+        </SettingsRow>
+
+        <SettingsRow title="Crossfade">
+          <div className="chip-row">
+            {[0, 2, 4, 6, 8].map((seconds) => (
+              <button
+                key={seconds}
+                className={`sleep-chip label-medium${settings.crossfadeSeconds === seconds ? ' sleep-chip-active' : ''}`}
+                onClick={() => actions.updateSettings({ crossfadeSeconds: seconds })}
+              >
+                {seconds === 0 ? 'Off' : `${seconds}s`}
+              </button>
+            ))}
+          </div>
         </SettingsRow>
 
         <SettingsRow title="Data saver (prefer lowest bitrate)">
@@ -121,10 +123,25 @@ function SourcesSection() {
   };
 
   const add = () => {
-    const clean = url.trim().replace(/\/$/, '');
-    if (!clean.startsWith('http')) return;
-    const source: StreamSource = { name: clean.replace(/^https?:\/\//, ''), baseUrl: clean, kind, custom: true };
+    const clean = url.trim().replace(/\/+$/, '');
+    let parsed: URL;
+    try {
+      parsed = new URL(clean);
+    } catch {
+      actions.showToast('Enter a full https:// URL');
+      return;
+    }
+    if (parsed.protocol !== 'https:') {
+      actions.showToast('Only https:// instances are supported');
+      return;
+    }
+    if (sources.some((s) => s.baseUrl === clean)) {
+      actions.showToast('That source is already in the list');
+      return;
+    }
+    const source: StreamSource = { name: parsed.host, baseUrl: clean, kind, custom: true };
     actions.updateSettings({ sources: [source, ...sources] });
+    actions.showToast(`Added ${parsed.host}`);
     setUrl('');
     setAdding(false);
   };

@@ -11,7 +11,8 @@ installable PWA. Works on GitHub Pages and Vercel.
 | Home / Explore / Library / Search tabs | Same four tabs, floating glass bar (collapses on scroll) |
 | Mini player + glass now-playing dock | Mini player pill + expandable player (side pane ≥ 900px) |
 | Now Playing (mesh gradient, artwork) | Palette extracted from artwork → gradient background |
-| Queue with shuffle / repeat / "play next" | Same, with drag-free remove rows |
+| Queue with shuffle / repeat / "play next" | Same — grouped now-playing/up-next list, remove rows, clear upcoming |
+| Crossfade (Media3) | Off/2/4/6/8 s overlap fade between queued tracks (Settings) |
 | Word/syllable lyrics (multiple sources) | LRCLIB synced lyrics with active-line highlight |
 | Sleep timer, playback speed, data saver | Same, in Settings / player footer |
 | Pluggable module sources | Piped / Invidious instance pool + custom sources (Settings → Sources) |
@@ -31,7 +32,8 @@ installable PWA. Works on GitHub Pages and Vercel.
   (Opus itag 251 ≈ 145 kbps top) with Piped `audioStreams` as fallback. The
   `<audio>` element is left **without** `crossOrigin`: googlevideo serves no
   ACAO header, and no-cors media playback works — adding crossOrigin would
-  enable Web Audio (crossfade) but mute playback entirely.
+  enable Web Audio but mute playback entirely. Crossfade is instead done by
+  overlapping the player's two pool elements (no Web Audio needed).
 - **Guest library** (`src/data/library.ts`): likes, playlists, history and
   recents live in localStorage — the same surfaces the app draws on an
   account, backed by the device instead.

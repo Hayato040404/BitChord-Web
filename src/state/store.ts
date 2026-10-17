@@ -12,6 +12,7 @@ import type { PlayerState } from '../player/player';
 import {
   loadLibrary,
   loadSettings,
+  newPlaylistId,
   saveLiked,
   saveHistory,
   savePlaylists,
@@ -44,6 +45,10 @@ interface AppState {
   recents: Song[];
   toast: { id: number; message: string } | null;
   detailPages: Record<string, DetailPage>;
+  /** Pages that failed to load, with the message for the retry UI. */
+  detailErrors: Record<string, string>;
+  /** The song a row menu (play next / add to playlist…) is open for. */
+  menuSong: Song | null;
 }
 
 type Listener = () => void;
@@ -58,6 +63,8 @@ let state: AppState = {
   ...loadLibrary(),
   toast: null,
   detailPages: {},
+  detailErrors: {},
+  menuSong: null,
 };
 
 const listeners = new Set<Listener>();
@@ -112,11 +119,16 @@ export const actions = {
     try {
       const page = await fetchDetail(browseId);
       state.detailPages = { ...state.detailPages, [browseId]: page };
+      const detailErrors = { ...state.detailErrors };
+      delete detailErrors[browseId];
+      state.detailErrors = detailErrors;
       emit();
     } catch (e) {
-      state.toast = {
-        id: Date.now(),
-        message: e instanceof Error ? e.message : 'Could not load this page',
+      // Remember the failure so the detail screen can offer a retry instead
+      // of spinning on its skeleton forever.
+      state.detailErrors = {
+        ...state.detailErrors,
+        [browseId]: e instanceof Error ? e.message : 'Could not load this page',
       };
       emit();
     }
@@ -137,11 +149,24 @@ export const actions = {
     emit();
   },
 
+  openSongMenu(song: Song): void {
+    state.menuSong = song;
+    emit();
+  },
+
+  closeSongMenu(): void {
+    state.menuSong = null;
+    emit();
+  },
+
   showToast(message: string): void {
-    state.toast = { id: Date.now(), message };
+    const toast = { id: Date.now(), message };
+    state.toast = toast;
     emit();
     window.setTimeout(() => {
-      if (state.toast?.message === message) {
+      // Only clear the toast this call created — a newer toast may have
+      // replaced it in the meantime.
+      if (state.toast?.id === toast.id) {
         state.toast = null;
         emit();
       }
@@ -184,7 +209,7 @@ export const actions = {
 
   createPlaylist(title: string, songs: Song[] = []): void {
     const playlist: UserPlaylist = {
-      id: `local:${Date.now().toString(36)}`,
+      id: newPlaylistId(),
       title,
       createdAt: Date.now(),
       songs,
@@ -219,6 +244,9 @@ export const actions = {
 
   recordPlay(song: Song | null, sourceName: string): void {
     if (!song) return;
+    // Explicit records (a tap in a list) satisfy the change-tracking that
+    // notePlayForCurrentSong would otherwise redo under a generic source.
+    lastPlayedVideoId = song.videoId;
     const entry = { song: { ...song, playbackSource: sourceName }, at: Date.now() };
     state.history = [entry, ...state.history.filter((h) => h.song.videoId !== song.videoId)].slice(0, 500);
     saveHistory(state.history);

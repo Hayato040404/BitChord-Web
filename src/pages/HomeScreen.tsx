@@ -45,17 +45,19 @@ export function HomeScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) =
       };
       actions.playSongs([song], 0, item.browseId ? 'Browse' : 'Home');
       // Radio keeps playing after the seed: resolve the queue behind it.
-      void (async () => {
-        const { fetchRadio } = await import('../api/repository');
-        try {
-          const radio = await fetchRadio(item.videoId!);
-          if (radio.length > 0 && app.settings.autoplay) {
-            player.setQueue([...player.getSnapshot().queue, ...radio]);
+      if (app.settings.autoplay) {
+        void (async () => {
+          const { fetchRadio } = await import('../api/repository');
+          try {
+            const radio = await fetchRadio(item.videoId!);
+            if (radio.length > 0 && player.getSnapshot().queue[0]?.videoId === item.videoId) {
+              player.setQueue([...player.getSnapshot().queue, ...radio]);
+            }
+          } catch {
+            /* seed keeps playing either way */
           }
-        } catch {
-          /* seed keeps playing either way */
-        }
-      })();
+        })();
+      }
     } else if (item.browseId) {
       onOpenDetail(item);
     }

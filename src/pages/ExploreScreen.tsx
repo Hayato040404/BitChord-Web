@@ -17,6 +17,7 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
   const [selected, setSelected] = useState<MoodGenre | null>(null);
   const [shelves, setShelves] = useState<HomeShelf[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +31,7 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadTick]);
 
   useEffect(() => {
     if (!selected) return;
@@ -47,7 +48,7 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
     return () => {
       cancelled = true;
     };
-  }, [selected]);
+  }, [selected, reloadTick]);
 
   const onItem = (item: ShelfItem) => {
     if (item.videoId) {
@@ -82,7 +83,11 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
           </h1>
         </div>
         {error ? (
-          <MessageState title="Something went wrong" message={error} onRetry={() => setSelected({ ...selected })} />
+          <MessageState
+            title="Something went wrong"
+            message={error}
+            onRetry={() => setReloadTick((n) => n + 1)}
+          />
         ) : shelves === null ? (
           <FeedSkeleton firstIsHero={false} />
         ) : shelves.length === 0 ? (
@@ -102,7 +107,11 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
         Explore
       </h1>
       {error && genres === null ? (
-        <MessageState title="Something went wrong" message={error} />
+        <MessageState
+          title="Something went wrong"
+          message={error}
+          onRetry={() => setReloadTick((n) => n + 1)}
+        />
       ) : genres === null ? (
         <FeedSkeleton firstIsHero={false} />
       ) : (

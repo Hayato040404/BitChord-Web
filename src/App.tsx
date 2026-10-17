@@ -18,6 +18,7 @@ import { SearchScreen } from './pages/SearchScreen';
 import { DetailScreen } from './pages/DetailScreen';
 import { NowPlaying } from './pages/NowPlaying';
 import { SettingsSheet } from './pages/SettingsSheet';
+import { SongMenuSheet } from './components/SongMenuSheet';
 import type { ShelfItem } from './api/models';
 import { SettingsIcon } from './components/icons';
 
@@ -93,6 +94,7 @@ export default function App() {
         <button
           className="icon-button"
           onClick={() => hasTrack && actions.setShowNowPlaying(!app.showNowPlaying)}
+          disabled={!hasTrack}
           aria-label="Now playing"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
@@ -120,6 +122,8 @@ export default function App() {
       {!wide && showPlayerOverlay && <NowPlaying />}
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
+
+      <SongMenuSheet />
 
       <Toast />
     </div>

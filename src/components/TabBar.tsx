@@ -40,8 +40,13 @@ export function BottomBars() {
   const lastScroll = useRef(0);
 
   useEffect(() => {
+    // The page scrolls inside `.app-page` (the app shell is a fixed-height
+    // flex column), so listening on `window` — whose scrollY never moves —
+    // would leave the bar permanently expanded.
+    const page = document.querySelector('.app-page');
+    if (!page) return;
     const onScroll = () => {
-      const y = window.scrollY;
+      const y = page.scrollTop;
       const delta = y - lastScroll.current;
       lastScroll.current = y;
       if (y < 24) {
@@ -51,8 +56,8 @@ export function BottomBars() {
       if (delta > 12) setInline(true);
       else if (delta < -12) setInline(false);
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    page.addEventListener('scroll', onScroll, { passive: true });
+    return () => page.removeEventListener('scroll', onScroll);
   }, []);
 
   const busy = playerState.loading;

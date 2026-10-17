@@ -202,6 +202,11 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
     const saved = getSavedLyricsMeta(song.videoId);
     return saved?.offsetMs ?? 0;
   });
+  // 曲が切り替わったらオフセットをその曲の保存値に戻す(ページは
+  // マウントされ続けるため、初期化だけでは次の曲に引き継いでしまう)。
+  useEffect(() => {
+    setOffsetMs(getSavedLyricsMeta(song.videoId)?.offsetMs ?? 0);
+  }, [song.videoId]);
   const [activeIndex, setActiveIndex] = useState(-1);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const rowsRef = useRef(new Map<number, HTMLDivElement>());

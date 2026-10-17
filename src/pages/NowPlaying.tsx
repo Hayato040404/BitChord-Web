@@ -30,6 +30,7 @@ import {
   SkipPreviousIcon,
   SleepIcon,
   SpeedIcon,
+  VolumeIcon,
 } from '../components/icons';
 
 type Page = 'player' | 'queue' | 'lyrics';
@@ -43,6 +44,7 @@ export function NowPlaying() {
   const [lyricsLoading, setLyricsLoading] = useState(true);
   const [showSleep, setShowSleep] = useState(false);
   const [showSpeed, setShowSpeed] = useState(false);
+  const [showVolume, setShowVolume] = useState(false);
 
   const art = song?.thumbnailUrl ?? null;
   const trackKey = song?.videoId ?? '';
@@ -95,8 +97,10 @@ export function NowPlaying() {
     return () => {
       cancelled = true;
     };
+    // durationMs only feeds match scoring; refetching on every tick would be
+    // absurd, so only the track and the synced-lyrics toggle re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [song?.videoId]);
+  }, [song?.videoId, app.settings.syncedLyrics]);
 
   if (!song) return null;
 
@@ -144,6 +148,15 @@ export function NowPlaying() {
             </button>
           </div>
 
+          {playerState.error && (
+            <div className="player-error-row" role="alert">
+              <span className="player-error-text body-medium">{playerState.error}</span>
+              <button className="player-error-retry label-medium" onClick={() => player.retryCurrent()}>
+                Retry
+              </button>
+            </div>
+          )}
+
           <SeekBar />
 
           <div className="now-playing-transport">
@@ -181,29 +194,41 @@ export function NowPlaying() {
           </div>
 
           <div className="now-playing-footer">
-            <button className="icon-button" onClick={() => setShowSpeed(true)} aria-label="Playback speed" style={{ color: 'rgba(255,255,255,0.8)' }}>
-              <SpeedIcon size={20} />
-            </button>
-            <span className="label-small" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <div className="now-playing-footer-group">
+              <button className="icon-button" onClick={() => setShowSpeed(true)} aria-label="Playback speed" style={{ color: 'rgba(255,255,255,0.8)' }}>
+                <SpeedIcon size={20} />
+              </button>
+              <button
+                className="icon-button"
+                onClick={() => setShowVolume(true)}
+                aria-label="Volume"
+                style={{ color: 'rgba(255,255,255,0.8)' }}
+              >
+                <VolumeIcon size={20} />
+              </button>
+            </div>
+            <span className="now-playing-via label-small">
               {playerState.stream?.source ? `via ${playerState.stream.source}` : ''}
             </span>
-            <button
-              className="icon-button"
-              onClick={() => setPage('queue')}
-              aria-label="Queue"
-              style={{ color: 'rgba(255,255,255,0.8)' }}
-            >
-              <QueueIcon size={20} />
-            </button>
-            <button
-              className="icon-button now-playing-lyrics-button"
-              onClick={() => setPage('lyrics')}
-              aria-label="Lyrics"
-              style={{ color: !lyricsLoading && lyrics ? '#fff' : 'rgba(255,255,255,0.5)' }}
-            >
-              <LyricsIcon size={20} />
-              {!lyricsLoading && lyrics?.wordSynced && <span className="lyrics-ready-dot" />}
-            </button>
+            <div className="now-playing-footer-group">
+              <button
+                className="icon-button"
+                onClick={() => setPage('queue')}
+                aria-label="Queue"
+                style={{ color: 'rgba(255,255,255,0.8)' }}
+              >
+                <QueueIcon size={20} />
+              </button>
+              <button
+                className="icon-button now-playing-lyrics-button"
+                onClick={() => setPage('lyrics')}
+                aria-label="Lyrics"
+                style={{ color: !lyricsLoading && lyrics ? '#fff' : 'rgba(255,255,255,0.5)' }}
+              >
+                <LyricsIcon size={20} />
+                {!lyricsLoading && lyrics?.wordSynced && <span className="lyrics-ready-dot" />}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -222,6 +247,7 @@ export function NowPlaying() {
 
       {showSleep && <SleepSheet onClose={() => setShowSleep(false)} />}
       {showSpeed && <SpeedSheet onClose={() => setShowSpeed(false)} />}
+      {showVolume && <VolumeSheet onClose={() => setShowVolume(false)} />}
     </div>
   );
 }
@@ -254,6 +280,16 @@ function SeekBar() {
     setDragging(fraction * duration);
   };
 
+  const release = (e: React.PointerEvent<HTMLDivElement>) => {
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      /* capture may already be gone; nothing to do */
+    }
+  };
+
   return (
     <div className="seek-wrap">
       <div
@@ -268,7 +304,12 @@ function SeekBar() {
         onPointerUp={(e) => {
           if (dragging !== null) player.seek(dragging);
           setDragging(null);
-          e.currentTarget.releasePointerCapture(e.pointerId);
+          release(e);
+        }}
+        onPointerCancel={(e) => {
+          // A scrolling gesture steals the drag: never seek on a cancel.
+          setDragging(null);
+          release(e);
         }}
       >
         <div className="seek-fill" style={{ width: `${(position / duration) * 100}%` }} />
@@ -286,6 +327,15 @@ function QueuePage({ onBack }: { onBack: () => void }) {
   const app = useApp();
   const playerState = usePlayer();
   const current = playerState.queue[playerState.index] ?? null;
+  const upcoming = playerState.queue.slice(playerState.index + 1);
+  const emptyHint =
+    playerState.repeat === 'all'
+      ? 'Nothing else lined up — the queue loops from the top when this track ends.'
+      : playerState.repeat === 'one'
+        ? 'Nothing else lined up — this track repeats when it ends.'
+        : app.settings.autoplay
+          ? 'Nothing else lined up — AutoPlay will keep the music going when this ends.'
+          : 'Nothing else lined up — add more songs from the ⋯ menu anywhere.';
   return (
     <div className="queue-page">
       <div className="queue-top safe-top">
@@ -295,21 +345,57 @@ function QueuePage({ onBack }: { onBack: () => void }) {
           </svg>
         </button>
         <span className="title-medium">Queue</span>
-        <span style={{ width: 40 }} />
+        {upcoming.length > 0 ? (
+          <button
+            className="text-button label-medium"
+            onClick={() => {
+              player.clearUpcoming();
+              actions.showToast('Cleared upcoming songs');
+            }}
+          >
+            Clear
+          </button>
+        ) : (
+          <span style={{ width: 40 }} />
+        )}
       </div>
       <div className="queue-list">
-        {playerState.queue.map((song, i) => (
-          <SongRow
-            key={`${song.videoId}-${i}`}
-            song={song}
-            current={current}
-            playing={playerState.playing}
-            onPlay={() => void player.playAt(i)}
-            onRemove={() => player.removeFromQueue(i)}
-            onToggleLiked={() => actions.toggleLiked(song)}
-            liked={app.liked.some((s) => s.videoId === song.videoId)}
-          />
-        ))}
+        {current && (
+          <>
+            <div className="queue-section-label label-medium">Now playing</div>
+            <SongRow
+              song={current}
+              current={current}
+              playing={playerState.playing}
+              onPlay={() => void player.playAt(playerState.index)}
+              onRemove={() => player.removeFromQueue(playerState.index)}
+              onToggleLiked={() => actions.toggleLiked(current)}
+              liked={app.liked.some((s) => s.videoId === current.videoId)}
+            />
+          </>
+        )}
+        {upcoming.length > 0 ? (
+          <>
+            <div className="queue-section-label label-medium">Next up · {upcoming.length}</div>
+            {upcoming.map((song, i) => {
+              const index = playerState.index + 1 + i;
+              return (
+                <SongRow
+                  key={`${song.videoId}-${index}`}
+                  song={song}
+                  current={current}
+                  playing={playerState.playing}
+                  onPlay={() => void player.playAt(index)}
+                  onRemove={() => player.removeFromQueue(index)}
+                  onToggleLiked={() => actions.toggleLiked(song)}
+                  liked={app.liked.some((s) => s.videoId === song.videoId)}
+                />
+              );
+            })}
+          </>
+        ) : (
+          <div className="queue-empty-hint body-medium">{emptyHint}</div>
+        )}
       </div>
     </div>
   );
@@ -317,14 +403,22 @@ function QueuePage({ onBack }: { onBack: () => void }) {
 
 function SleepSheet({ onClose }: { onClose: () => void }) {
   const presets = [5, 10, 15, 30, 45, 60];
-  const remaining = player.sleepRemainingMs();
+  const [remaining, setRemaining] = useState(player.sleepRemainingMs());
+  const running = remaining !== null;
+  // The countdown ticks on its own clock; it must not depend on the player
+  // emitting (a paused player doesn't).
+  useEffect(() => {
+    if (!running) return;
+    const id = window.setInterval(() => setRemaining(player.sleepRemainingMs()), 1000);
+    return () => window.clearInterval(id);
+  }, [running]);
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet frosted" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-title title-medium">Sleep timer</div>
         {remaining !== null && (
           <div className="body-medium" style={{ color: 'var(--on-surface-variant)', marginBottom: 8 }}>
-            Stopping in {Math.ceil(remaining / 60000)} min
+            Stopping in {formatDuration(remaining)}
           </div>
         )}
         <div className="sleep-grid">
@@ -377,6 +471,41 @@ function SpeedSheet({ onClose }: { onClose: () => void }) {
               {speed}×
             </button>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VolumeSheet({ onClose }: { onClose: () => void }) {
+  const playerState = usePlayer();
+  const percent = Math.round(playerState.volume * 100);
+  return (
+    <div className="sheet-scrim" onClick={onClose}>
+      <div className="sheet frosted" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-title title-medium">Volume</div>
+        <div className="volume-row">
+          <button
+            className="icon-button"
+            onClick={() => player.setVolume(playerState.volume > 0 ? 0 : 1)}
+            aria-label={playerState.volume > 0 ? 'Mute' : 'Unmute'}
+          >
+            <VolumeIcon size={22} />
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={playerState.volume}
+            onChange={(e) => player.setVolume(Number(e.target.value))}
+            className="range-input"
+            aria-label="Volume"
+            style={{ flex: 1 }}
+          />
+          <span className="title-medium" style={{ minWidth: 44, textAlign: 'right' }}>
+            {percent}%
+          </span>
         </div>
       </div>
     </div>

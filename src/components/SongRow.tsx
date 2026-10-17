@@ -7,7 +7,7 @@
  * rides SmartArt so proxy failures fall back to YouTube's own stills.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Song } from '../api/models';
 import { SmartArt } from './SmartArt';
 import { LikeFilledIcon, LikeIcon, MoreIcon, PauseIcon, PlayIcon } from './icons';
@@ -40,8 +40,39 @@ export function SongRow({
   onRemove,
 }: SongRowProps) {
   const [pressed, setPressed] = useState(false);
-  const isCurrent =
-    current != null && current.title === song.title && current.artist === song.artist;
+  const longPressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
+  const isCurrent = current != null && current.videoId === song.videoId;
+
+  const clearLongPress = () => {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  // A held thumb on a row opens its menu (the app's onSongLongPress); the
+  // context menu covers desktop right-clicks.
+  const startLongPress = () => {
+    if (!onMenu) return;
+    clearLongPress();
+    longPressFired.current = false;
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = null;
+      longPressFired.current = true;
+      setPressed(false);
+      onMenu();
+    }, 550);
+  };
+
+  const handleClick = () => {
+    // The tap that ends a long-press must not also start playback.
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    onPlay();
+  };
 
   const handleContextMenu = (e: React.MouseEvent) => {
     if (onMenu) {
@@ -53,10 +84,13 @@ export function SongRow({
   return (
     <div
       className={`song-row${pressed ? ' song-row-pressed' : ''}`}
-      onClick={onPlay}
+      onClick={handleClick}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
+      onTouchStart={startLongPress}
+      onTouchEnd={clearLongPress}
+      onTouchMove={clearLongPress}
       onContextMenu={handleContextMenu}
       data-current={isCurrent || undefined}
     >

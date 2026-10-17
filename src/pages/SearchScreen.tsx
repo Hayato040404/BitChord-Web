@@ -25,10 +25,15 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
   const [filter, setFilter] = useState<SearchFilterId>('all');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [page, setPage] = useState<SearchPage | null>(null);
+  const [lastQuery, setLastQuery] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Monotonic ids: a resolved response only lands if it is still the latest
+  // request (a slow "lofi" search must not overwrite a newer "rock" one).
+  const searchSeq = useRef(0);
+  const suggestSeq = useRef(0);
 
   // Focus the field on search tab tap — the same signal MainActivity sends.
   useEffect(() => {
@@ -43,10 +48,15 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
       setSuggestions([]);
       return;
     }
+    const seq = ++suggestSeq.current;
     debounceRef.current = window.setTimeout(() => {
       fetchSuggestions(query)
-        .then(setSuggestions)
-        .catch(() => setSuggestions([]));
+        .then((s) => {
+          if (seq === suggestSeq.current) setSuggestions(s);
+        })
+        .catch(() => {
+          if (seq === suggestSeq.current) setSuggestions([]);
+        });
     }, 250);
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -56,16 +66,23 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
   const runSearch = (query: string, filterId: SearchFilterId) => {
     const trimmed = query.trim();
     if (!trimmed) return;
+    const seq = ++searchSeq.current;
+    setLastQuery(trimmed);
     setLoading(true);
     setError(null);
     setSuggestions([]);
     fetchSearch(trimmed, filterId)
-      .then(setPage)
+      .then((p) => {
+        if (seq === searchSeq.current) setPage(p);
+      })
       .catch((e) => {
+        if (seq !== searchSeq.current) return;
         setError(e instanceof Error ? e.message : 'Search failed');
         setPage(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (seq === searchSeq.current) setLoading(false);
+      });
   };
 
   // Re-run on filter change when there is a query.
@@ -108,7 +125,22 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
           enterKeyHint="search"
         />
         {input && (
-          <button className="icon-button" onClick={() => { setInput(''); setPage(null); }} aria-label="Clear">
+          <button
+            className="icon-button"
+            onClick={() => {
+              // Invalidate anything still in flight so it cannot repopulate
+              // the cleared screen.
+              searchSeq.current += 1;
+              suggestSeq.current += 1;
+              setInput('');
+              setSuggestions([]);
+              setPage(null);
+              setLastQuery(null);
+              setError(null);
+              setLoading(false);
+            }}
+            aria-label="Clear"
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l-4.9-4.9q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l4.9 4.9l4.9-4.9q.275-.275.7-.275t.7.275t.275.7t-.275.7l-4.9 4.9l4.9 4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275Z" />
             </svg>
@@ -116,7 +148,9 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
         )}
       </div>
 
-      {!page && suggestions.length > 0 && (
+      {/* Suggestions whenever the query differs from what was submitted —
+          typing on top of finished results gets hints again. */}
+      {input.trim() && input.trim() !== lastQuery && suggestions.length > 0 && (
         <div className="suggestions">
           {suggestions.map((suggestion) => (
             <button
@@ -156,6 +190,9 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
           <div className="body-medium" style={{ color: 'var(--on-surface-variant)' }}>
             {error}
           </div>
+          <button className="retry-button label-medium" onClick={() => runSearch(input, filter)}>
+            Try again
+          </button>
         </div>
       ) : page ? (
         <div className="results">
@@ -171,7 +208,7 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
                   onPlay={() => playTrack(song, page.rows)}
                   onToggleLiked={() => actions.toggleLiked(song)}
                   liked={app.liked.some((s) => s.videoId === song.videoId)}
-                  onMenu={() => actions.playNext(song)}
+                  onMenu={() => actions.openSongMenu(song)}
                 />
               );
             }

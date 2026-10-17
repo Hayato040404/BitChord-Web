@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import type { ShelfItem, Song } from '../api/models';
 import { actions, useApp, usePlayer } from '../state/store';
 import { player } from '../player/player';
-import { ShelfCarousel } from '../components/common';
+import { MessageState, ShelfCarousel } from '../components/common';
 import { SongRow } from '../components/SongRow';
 import { SmartArt } from '../components/SmartArt';
 
@@ -25,15 +25,24 @@ export function DetailScreen({
   const playerState = usePlayer();
   const current = playerState.queue[playerState.index] ?? null;
   const page = app.detailPages[browseId];
+  const loadError = app.detailErrors[browseId] ?? null;
 
   useEffect(() => {
-    if (!page) void actions.loadDetail(browseId);
-  }, [browseId, page]);
+    if (!page && !loadError) void actions.loadDetail(browseId);
+  }, [browseId, page, loadError]);
 
   if (!page) {
     return (
       <div className="feed">
-        <div className="skeleton" style={{ height: 300, borderRadius: 0 }} />
+        {loadError ? (
+          <MessageState
+            title="Could not load this page"
+            message={loadError}
+            onRetry={() => void actions.loadDetail(browseId)}
+          />
+        ) : (
+          <div className="skeleton" style={{ height: 300, borderRadius: 0 }} />
+        )}
       </div>
     );
   }
@@ -77,16 +86,11 @@ export function DetailScreen({
         </div>
       </div>
 
-      {page.type === 'ARTIST' ? (
+      {page.type === 'ARTIST' && page.shelves && page.shelves.length > 0 ? (
         <>
-          {page.shelves?.map((shelf, i) => (
+          {page.shelves.map((shelf, i) => (
             <ShelfCarousel key={`${shelf.title}-${i}`} shelf={shelf} onItemClick={onOpenDetail} />
           ))}
-          {(!page.shelves || page.shelves.length === 0) && (
-            <div className="page-gutter body-medium" style={{ color: 'var(--on-surface-variant)', padding: '12px 20px' }}>
-              No releases parsed from this artist page.
-            </div>
-          )}
         </>
       ) : (
         <>
@@ -97,9 +101,11 @@ export function DetailScreen({
               </svg>
               Play
             </button>
-            <button className="text-button label-medium" onClick={() => playAll(true)}>
-              Shuffle
-            </button>
+            {page.songs.length > 1 && (
+              <button className="text-button label-medium" onClick={() => playAll(true)}>
+                Shuffle
+              </button>
+            )}
           </div>
           <div className="detail-songs">
             {page.songs.map((song, i) => (
@@ -111,6 +117,7 @@ export function DetailScreen({
                 playing={playerState.playing}
                 onPlay={() => playSong(song)}
                 onToggleLiked={() => actions.toggleLiked(song)}
+                onMenu={() => actions.openSongMenu(song)}
                 liked={app.liked.some((s) => s.videoId === song.videoId)}
               />
             ))}

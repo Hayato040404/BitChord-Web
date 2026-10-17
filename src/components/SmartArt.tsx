@@ -10,16 +10,20 @@
 import { useEffect, useState } from 'react';
 import { artworkAt } from '../api/models';
 
-/** Proxy URL first, then YouTube's own stills, biggest first. */
+/** Proxy URL first, then YouTube's own stills, biggest first — deduped, so a
+    failed proxy URL is not retried at ladder position 1. */
 function candidatesFor(src: string | null | undefined, videoId?: string | null): string[] {
-  const urls: string[] = [];
-  if (src) urls.push(src);
-  if (videoId) {
-    urls.push(`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`);
-    urls.push(`https://i.ytimg.com/vi/${videoId}/sddefault.jpg`);
-    urls.push(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
-  }
-  return urls.slice(0, 4);
+  const urls = [
+    ...(src ? [src] : []),
+    ...(videoId
+      ? [
+          `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+          `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
+          `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        ]
+      : []),
+  ];
+  return [...new Set(urls)];
 }
 
 interface SmartArtProps {
