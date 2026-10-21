@@ -21,6 +21,7 @@ import {
 } from '../data/library';
 import type { Settings, UserPlaylist } from '../data/library';
 import type { BrowseType, DetailPage, Song } from '../api/models';
+import { setLanguageSource, t } from '../i18n';
 
 export type TabId = 'home' | 'explore' | 'library' | 'search';
 
@@ -68,6 +69,9 @@ let state: AppState = {
 };
 
 const listeners = new Set<Listener>();
+
+// The i18n table follows the stored language synchronously (t() during render).
+setLanguageSource(() => state.settings.language);
 
 function emit(): void {
   state = { ...state };
@@ -184,12 +188,12 @@ export const actions = {
 
   addToQueue(song: Song): void {
     void player.addToQueue(song);
-    actions.showToast('Added to queue');
+    actions.showToast(t('toast.addedToQueue'));
   },
 
   playNext(song: Song): void {
     player.playNext(song);
-    actions.showToast('Playing next');
+    actions.showToast(t('toast.playingNext'));
   },
 
   toggleLiked(song: Song): void {
@@ -200,7 +204,7 @@ export const actions = {
     state.liked = liked;
     saveLiked(liked);
     emit();
-    actions.showToast(exists ? 'Removed from Liked songs' : 'Added to Liked songs');
+    actions.showToast(exists ? t('toast.likedRemoved') : t('toast.likedAdded'));
   },
 
   isLiked(videoId: string): boolean {
@@ -225,7 +229,9 @@ export const actions = {
     );
     savePlaylists(state.playlists);
     emit();
-    actions.showToast(`Added to ${state.playlists.find((p) => p.id === playlistId)?.title ?? 'playlist'}`);
+    actions.showToast(state.playlists.find((p) => p.id === playlistId)?.title
+      ? t('toast.addedToPlaylist', { title: state.playlists.find((p) => p.id === playlistId)!.title })
+      : t('toast.addedToPlaylistPlain'));
   },
 
   removeFromPlaylist(playlistId: string, videoId: string): void {

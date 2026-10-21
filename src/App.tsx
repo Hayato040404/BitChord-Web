@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import { actions, useApp, usePlayer } from './state/store';
+import { player } from './player/player';
 import { notePlayForCurrentSong } from './state/store';
 import { BottomBars } from './components/TabBar';
 import { HomeScreen } from './pages/HomeScreen';
@@ -21,12 +22,80 @@ import { SettingsSheet } from './pages/SettingsSheet';
 import { SongMenuSheet } from './components/SongMenuSheet';
 import type { ShelfItem } from './api/models';
 import { SettingsIcon } from './components/icons';
+import { t } from './i18n';
 
 export default function App() {
   const app = useApp();
   const playerState = usePlayer();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [wide, setWide] = useState(() => window.innerWidth >= 900);
+
+  // <html lang> follows the stored language.
+  useEffect(() => {
+    document.documentElement.lang = app.settings.language === 'ja' ? 'ja' : 'en';
+  }, [app.settings.language]);
+
+  // Desktop keyboard shortcuts guarded against typing targets and modifiers.
+  useEffect(() => {
+    const lastNonMute = { value: 1 };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable ||
+          target.closest('button, a, [role="button"]'))
+      ) {
+        return;
+      }
+      const snapshot = () => player.getSnapshot();
+      if (!snapshot().queue.length) return;
+      switch (e.key) {
+        case ' ':
+        case 'k':
+        case 'K':
+          e.preventDefault();
+          player.togglePlayPause();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          player.seek(Math.max(0, snapshot().positionMs - 10_000));
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          player.seek(snapshot().positionMs + 10_000);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          player.setVolume(Math.min(1, snapshot().volume + 0.05));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          player.setVolume(Math.max(0, snapshot().volume - 0.05));
+          break;
+        default:
+          if (e.repeat) break;
+          if (e.key === 'n' || e.key === 'N') player.next();
+          else if (e.key === 'p' || e.key === 'P') player.previous();
+          else if (e.key === 's' || e.key === 'S') player.toggleShuffle();
+          else if (e.key === 'r' || e.key === 'R') player.cycleRepeat();
+          else if (e.key === 'm' || e.key === 'M') {
+            const volume = snapshot().volume;
+            if (volume > 0) {
+              lastNonMute.value = volume;
+              player.setVolume(0);
+            } else {
+              player.setVolume(lastNonMute.value || 1);
+            }
+          }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   // Theme class on <html>, following the app's ThemeMode.
   useEffect(() => {
@@ -95,13 +164,13 @@ export default function App() {
           className="icon-button"
           onClick={() => hasTrack && actions.setShowNowPlaying(!app.showNowPlaying)}
           disabled={!hasTrack}
-          aria-label="Now playing"
+          aria-label={t('aria.nowPlaying')}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22Zm0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20Zm0-2q2.5 0 4.25-1.75T18 12t-1.75-4.25T12 6T7.75 7.75T6 12t1.75 4.25T12 18Zm0-2q-1.65 0-2.825-1.175T8 12t1.175-2.825T12 8t2.825 1.175T16 12t-1.175 2.825T12 16Z" />
           </svg>
         </button>
-        <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
+        <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label={t('aria.settings')}>
           <SettingsIcon size={22} />
         </button>
       </div>

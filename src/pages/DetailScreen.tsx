@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import type { ShelfItem, Song } from '../api/models';
 import { actions, useApp, usePlayer } from '../state/store';
+import { t } from '../i18n';
 import { player } from '../player/player';
 import { MessageState, ShelfCarousel } from '../components/common';
 import { SongRow } from '../components/SongRow';
@@ -36,7 +37,7 @@ export function DetailScreen({
       <div className="feed">
         {loadError ? (
           <MessageState
-            title="Could not load this page"
+            title={t('detail.loadError')}
             message={loadError}
             onRetry={() => void actions.loadDetail(browseId)}
           />
@@ -74,7 +75,7 @@ export function DetailScreen({
         />
         <div className="detail-header-scrim" />
         <div className="detail-header-content page-gutter">
-          <button className="icon-button detail-back" onClick={() => actions.popDetail()} aria-label="Back">
+          <button className="icon-button detail-back" onClick={() => actions.popDetail()} aria-label={t('aria.back')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M10.8 16.8q.3-.3.288-.7t-.288-.7L7.8 12.5h9.4q.375 0 .638-.263t.262-.637t-.262-.638t-.638-.262H7.8l3-3q.3-.3.3-.7t-.3-.7t-.7-.3t-.7.3L5.4 11.3q-.15.15-.213.325T5.125 12t.063.375t.212.325l4.6 4.6q.275.275.688.288t.712-.288Z" />
             </svg>
@@ -99,11 +100,11 @@ export function DetailScreen({
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5.14v14.72q0 .575.5.8t.9-.06l10.6-7.36q.4-.275.4-.74t-.4-.74L9.4 4.4q-.4-.285-.9-.06T8 5.14Z" transform="translate(1 0)" />
               </svg>
-              Play
+              {t('playlist.play')}
             </button>
             {page.songs.length > 1 && (
               <button className="text-button label-medium" onClick={() => playAll(true)}>
-                Shuffle
+                {t('playlist.shuffle')}
               </button>
             )}
           </div>
@@ -123,7 +124,7 @@ export function DetailScreen({
             ))}
             {page.songs.length === 0 && (
               <div className="page-gutter body-medium" style={{ color: 'var(--on-surface-variant)', padding: '12px 20px' }}>
-                No tracks parsed from this page.
+                {t('detail.empty')}
               </div>
             )}
           </div>

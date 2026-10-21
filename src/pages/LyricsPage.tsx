@@ -14,18 +14,16 @@
  *  - Both of those run off one rAF loop reading the audio element directly —
  *    `useLyricsClock` — so the sweep is never a frame behind the song. Rows
  *    only re-render when the sung line changes.
- *  - Words off the lead sit in the app's falloff ladder — alpha [1, .8, .7,
- *    .58, .46] and blur [0, 1, 1, 1.7, 2.4]px indexed by distance — so the
- *    two lines around the playing one stay readable and only past that does
- *    the panel let go. Past lines dim rather than vanish; the reference hides
- *    them, which is not what this app wants.
+ *  - Words off the lead step down the am-lyrics ladder: the next line stays
+ *    open, then opacity [1, .8, .7, .58, .46] and a soft em-based blur push
+ *    everything else back. Past lines dim rather than vanish.
  *  - Tapping any line seeks to it (the app's onSeekToLine), a row under a
  *    finger dips, and the active row scales up from 0.98.
  *  - Instrumental breaks are three dots that fill left to right across the
  *    break, and the row only opens while the break is playing.
  *  - Plain-text providers get [Section] headers as chips.
- *  - A lyrics offset (± ms) and the provider / manual search live in the
- *    toolbar; everything re-fetches live.
+ *  - A floating header holds the back / timing / provider actions; the source
+ *    attribution sits at the end of the scroll, as it does in am-lyrics.
  */
 
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -38,6 +36,8 @@ import { createLyricScroll } from '../lyrics/scroll';
 import { fetchLyrics } from '../lyrics/providers';
 import type { Song } from '../api/models';
 import { saveLyricsBySongEntry, clearLyricsBySongEntry } from '../data/library';
+import { t } from '../i18n';
+import { BackIcon, MoreIcon } from '../components/icons';
 
 export function getSavedLyricsMeta(videoId: string): { offsetMs: number; manualTitle: string; manualArtist: string } | null {
   try {
@@ -69,12 +69,6 @@ function saveManualQueryForSong(videoId: string, title: string, artist: string):
     manualArtist: artist.trim(),
   });
 }
-
-/** The app's LINE_FALLOFF_ALPHA / LINE_FALLOFF_BLUR, indexed by distance. */
-const FALLOFF_ALPHA = [1, 0.8, 0.7, 0.58, 0.46];
-const FALLOFF_BLUR = [0, 1, 1, 1.7, 2.4];
-const PRESSED_SCALE = 0.96;
-const INACTIVE_SCALE = 0.98;
 
 /** Genius.isSectionHeader: [Chorus], [Verse 2], and friends. */
 function isSectionHeader(text: string): boolean {
@@ -133,6 +127,9 @@ function useLyricsClock({
     let raf = 0;
     let last = 0;
     let current = -2;
+    /** Keep re-aiming briefly after a line change: an interlude in front of
+     *  the new line is collapsing, which shifts it under the anchor. */
+    let followUntil = 0;
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
@@ -151,6 +148,7 @@ function useLyricsClock({
         }
         current = index;
         onIndexRef.current(index);
+        followUntil = now + 650;
 
         const next = index >= 0 ? rows.current.get(index) : null;
         // A hand on the panel wins for a few seconds; then it takes over again.
@@ -172,6 +170,9 @@ function useLyricsClock({
             row.style.setProperty('--gap-through', through.toFixed(3));
           } else {
             paintRow(row, t / 1000);
+          }
+          if (now < followUntil && !scroller.isUserScrolling()) {
+            scroller.trackRow(row);
           }
         }
       }
@@ -252,42 +253,68 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
 
   const wordmark = lyrics
     ? lyrics.wordSynced
-      ? 'WORD SYNC'
+      ? t('lyrics.wordSync')
       : lyrics.synced
-        ? 'SYNCED'
+        ? t('lyrics.synced')
         : ''
     : '';
+  const hasDuet = lyrics?.synced === true && lyrics.lines.some((line) => line.alignment === 'end');
 
   return (
     <div className="lyrics-page">
-      <div className="queue-top safe-top">
-        <button className="icon-button" onClick={onBack} aria-label="Back">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10.8 16.8q.3-.3.288-.7t-.288-.7L7.8 12.5h9.4q.375 0 .638-.263t.262-.637t-.262-.638t-.638-.262H7.8l3-3q.3-.3.3-.7t-.3-.7t-.7-.3t-.7.3L5.4 11.3q-.15.15-.213.325T5.125 12t.063.375t.212.325l4.6 4.6q.275.275.688.288t.712-.288Z" />
-          </svg>
-        </button>
-        <button
-          className="lyrics-provider-link title-medium"
-          onClick={() => setSheet('provider')}
-          title="Change lyrics provider"
-        >
-          {loading ? 'Searching…' : (lyrics?.provider ?? 'Lyrics')}
-        </button>
-        <div className="lyrics-top-actions">
-          <span className="lyrics-wordmark label-small">{wordmark}</span>
-          <button className="icon-button" onClick={() => setSheet('offset')} aria-label="Lyrics offset" title="Adjust timing">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M11 17h2v-6h-2Zm1-8q.425 0 .713-.288T13 8t-.287-.712T12 7t-.712.288T11 8t.288.713T12 9Zm0 13q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22Z" />
-            </svg>
+      <header className="lyrics-top">
+        <div className="lyrics-top-inner">
+          <button className="lyrics-icon-button" type="button" onClick={onBack} aria-label={t('aria.back')}>
+            <BackIcon size={22} />
           </button>
+          <div className="lyrics-meta">
+            <div className="lyrics-meta-title">{song.title}</div>
+            <div className="lyrics-meta-artist">{song.artist}</div>
+          </div>
+          <div className="lyrics-top-actions">
+            <button
+              className={`lyrics-icon-button${offsetMs !== 0 ? ' is-on' : ''}`}
+              type="button"
+              onClick={() => setSheet('offset')}
+              aria-label={t('lyrics.adjustTiming')}
+              title={t('lyrics.adjustTiming')}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="8" />
+                <path d="M12 7.6V12l3 1.8" />
+              </svg>
+            </button>
+            <button
+              className="lyrics-icon-button"
+              type="button"
+              onClick={() => setSheet('provider')}
+              aria-label={t('lyrics.changeProvider')}
+              title={t('lyrics.changeProvider')}
+            >
+              <MoreIcon size={20} />
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {offsetMs !== 0 && (
-        <div className="lyrics-offset-note label-small">
-          offset {offsetMs > 0 ? '+' : ''}
-          {offsetMs}ms
-        </div>
+        <button
+          className="lyrics-offset-note label-small"
+          type="button"
+          onClick={() => setSheet('offset')}
+          title={t('lyrics.adjustTiming')}
+        >
+          {t('lyrics.offsetApplied', { value: `${offsetMs > 0 ? '+' : ''}${offsetMs}ms` })}
+        </button>
       )}
 
       {loading && !lyrics ? (
@@ -301,7 +328,9 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
         />
       ) : (
         <div
-          className={`lyrics-body${lyrics.synced ? ' lyrics-body-synced' : ''}`}
+          className={`lyrics-body${lyrics.synced ? ' lyrics-body-synced' : ' lyrics-body-plain'}${
+            hasDuet ? ' lyrics-body-duet' : ''
+          }`}
           ref={bodyRef}
         >
           {lyrics.synced
@@ -326,6 +355,7 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
                   </div>
                 ),
               )}
+          <LyricsCredit lyrics={lyrics} badge={wordmark} onOpen={() => setSheet('provider')} />
         </div>
       )}
 
@@ -344,28 +374,48 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
   );
 }
 
-/** The app's LyricsSkeleton: text-shaped blocks with ragged bottoms. */
+/** am-lyrics' seven-bar skeleton, sized to the lyric type. */
 function LyricsSkeleton() {
-  const BLOCKS = [
-    [0.97, 0.54],
-    [0.92, 0.99, 0.41],
-    [0.68],
-    [0.95, 0.73],
-    [0.89, 0.96, 0.37],
-  ];
+  const WIDTHS = [64, 84, 58, 76, 50, 68, 60];
   return (
-    <div className="lyrics-body" aria-hidden="true">
-      {BLOCKS.map((block, i) => (
-        <div key={i} className="lyrics-skel-block">
-          {block.map((width, j) => (
-            <div
-              key={j}
-              className="skeleton lyrics-skel-bar"
-              style={{ width: `${width * 100}%`, animationDelay: `${(i * 3 + j) * 0.12}s` }}
-            />
-          ))}
-        </div>
+    <div className="lyrics-body lyrics-body-synced lyrics-skeleton" aria-hidden="true">
+      {WIDTHS.map((width, i) => (
+        <div
+          key={i}
+          className="lyrics-skeleton-line"
+          style={{ width: `${width}%`, animationDelay: `${i * 0.08}s` }}
+        />
       ))}
+    </div>
+  );
+}
+
+/**
+ * The source line at the bottom of the scroll, as in am-lyrics: attribution
+ * lives with the lyrics rather than in a toolbar, and doubles as the way back
+ * into the provider search.
+ */
+function LyricsCredit({
+  lyrics,
+  badge,
+  onOpen,
+}: {
+  lyrics: Lyrics;
+  badge: string;
+  onOpen: () => void;
+}) {
+  const provider = lyrics.provider || t('lyrics.providerFallback');
+  return (
+    <div className="lyrics-credit">
+      <button
+        className="lyrics-credit-source"
+        type="button"
+        onClick={onOpen}
+        title={t('lyrics.changeProvider')}
+      >
+        {t('lyrics.source', { provider })}
+      </button>
+      {badge && <span className="lyrics-credit-badge">{badge}</span>}
     </div>
   );
 }
@@ -391,9 +441,9 @@ function OffsetSheet({
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet frosted" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-title title-medium">Lyrics timing</div>
+        <div className="sheet-title title-medium">{t('lyrics.offsetTitle')}</div>
         <div className="body-medium" style={{ color: 'var(--on-surface-variant)', marginBottom: 10 }}>
-          Lyrics ahead of the song? Nudge them back. Behind? Nudge them forward.
+          {t('lyrics.offsetHint')}
         </div>
         <div className="offset-row">
           <button className="sleep-chip label-medium" onClick={() => step(-200)}>
@@ -421,7 +471,7 @@ function OffsetSheet({
               onChange(0);
             }}
           >
-            Reset
+            {t('lyrics.reset')}
           </button>
           <button
             className="text-button label-medium"
@@ -432,7 +482,7 @@ function OffsetSheet({
               onClose();
             }}
           >
-            Clear saved
+            {t('lyrics.clearSaved')}
           </button>
           <button
             className="lyrics-manual-button label-medium"
@@ -441,7 +491,7 @@ function OffsetSheet({
               onClose();
             }}
           >
-            Done
+            {t('lyrics.done')}
           </button>
         </div>
       </div>
@@ -501,10 +551,9 @@ function ProviderSheet({
     const saved = getSavedLyricsMeta(song.videoId);
     return (
       <div className="lyrics-empty">
-        <div className="lyrics-empty-title headline-medium">No lyrics found</div>
+        <div className="lyrics-empty-title headline-medium">{t('lyrics.noLyrics')}</div>
         <div className="body-medium" style={{ color: 'rgba(255,255,255,0.6)', maxWidth: 330, textAlign: 'center' }}>
-          The title on YouTube is sometimes not the title on the record. Correct it
-          below — the search covers BiniLyrics, PaxSenix, BetterLyrics and LRCLIB.
+          {t('lyrics.titleFixBody')}
         </div>
         {saved && (
           <button
@@ -516,7 +565,7 @@ function ProviderSheet({
               setArtist(song.artist);
             }}
           >
-            Clear saved name
+            {t('lyrics.clearSavedName')}
           </button>
         )}
         <form
@@ -530,19 +579,19 @@ function ProviderSheet({
             className="lyrics-manual-input body-medium"
             value={saved?.manualTitle || title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Song title"
-            aria-label="Song title"
+            placeholder={t('aria.songTitle')}
+            aria-label={t('aria.songTitle')}
             autoFocus
           />
           <input
             className="lyrics-manual-input body-medium"
             value={saved?.manualArtist || artist}
             onChange={(e) => setArtist(e.target.value)}
-            placeholder="Artist"
-            aria-label="Artist"
+            placeholder={t('aria.artist')}
+            aria-label={t('aria.artist')}
           />
           <button className="lyrics-manual-button label-medium" type="submit" disabled={busy}>
-            {busy ? 'Searching…' : 'Search'}
+            {busy ? t('lyrics.searching') : t('lyrics.search')}
           </button>
         </form>
       </div>
@@ -552,7 +601,7 @@ function ProviderSheet({
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet frosted" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-title title-medium">Lyrics</div>
+        <div className="sheet-title title-medium">{t('player.lyricsTitle')}</div>
         {found !== null && (
           <div className="lyrics-found-note body-medium">
             {found
@@ -575,11 +624,11 @@ function ProviderSheet({
               setArtist(song.artist);
             }}
           >
-            Clear saved name
+            {t('lyrics.clearSavedName')}
           </button>
         )}
         <div className="body-medium" style={{ color: 'var(--on-surface-variant)', marginBottom: 10 }}>
-          Search all providers with the recording's real name:
+          {t('lyrics.searchHint')}
         </div>
         <form
           className="lyrics-manual"
@@ -592,18 +641,18 @@ function ProviderSheet({
             className="lyrics-manual-input body-medium"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Song title"
-            aria-label="Song title"
+            placeholder={t('aria.songTitle')}
+            aria-label={t('aria.songTitle')}
           />
           <input
             className="lyrics-manual-input body-medium"
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
-            placeholder="Artist"
-            aria-label="Artist"
+            placeholder={t('aria.artist')}
+            aria-label={t('aria.artist')}
           />
           <button className="lyrics-manual-button label-medium" type="submit" disabled={busy}>
-            {busy ? 'Searching…' : 'Search'}
+            {busy ? t('lyrics.searching') : t('lyrics.search')}
           </button>
         </form>
       </div>
@@ -627,7 +676,9 @@ const LyricRow = memo(function LyricRow({
   const [pressed, setPressed] = useState(false);
   const active = index === activeIndex;
   const past = index < activeIndex;
-  const distance = Math.min(4, Math.abs(index - activeIndex));
+  const next = activeIndex >= 0 && index === activeIndex + 1;
+  const distance =
+    activeIndex < 0 ? Math.min(4, index + 1) : Math.min(4, Math.abs(index - activeIndex));
   const background = line.background;
 
   // The word-sync model: words re-split with Intl.Segmenter, grouped into
@@ -676,7 +727,7 @@ const LyricRow = memo(function LyricRow({
         onClick={onTap}
         role="button"
         tabIndex={-1}
-        aria-label="Instrumental"
+        aria-label={t('aria.instrumental')}
       >
         {[0, 1, 2].map((dot) => (
           <span key={dot} style={{ '--dot': dot } as CSSProperties} />
@@ -685,26 +736,19 @@ const LyricRow = memo(function LyricRow({
     );
   }
 
-  // The falloff ladder: alpha and blur both indexed by distance from the
-  // sung line, easing on the shared settle curve.
-  const opacity = active ? 1 : past ? FALLOFF_ALPHA[distance] * 0.85 : FALLOFF_ALPHA[distance];
-  const blur = active ? 0 : FALLOFF_BLUR[distance];
-  const scale = pressed ? PRESSED_SCALE : active ? 1 : INACTIVE_SCALE;
-
+  // The falloff ladder lives in CSS: distance decides opacity/blur, the row
+  // under the lead turns white, and only the immediate next line is warmed up.
   const lineClass = [
     'lyric-line',
     'lyrics-big',
     active ? 'lyric-active' : past ? 'lyric-past' : 'lyric-future',
+    `lyric-d${distance}`,
+    next ? 'lyric-next' : '',
+    pressed ? 'lyric-pressed' : '',
     line.alignment === 'end' ? 'lyric-end' : '',
   ]
     .filter(Boolean)
     .join(' ');
-  const style: React.CSSProperties = {
-    opacity,
-    filter: blur > 0 ? `blur(${blur}px)` : undefined,
-    transform: `scale(${scale})`,
-    transformOrigin: line.alignment === 'end' ? 'right center' : 'left center',
-  };
 
   const seek = () => {
     setPressed(false);
@@ -716,7 +760,6 @@ const LyricRow = memo(function LyricRow({
       <div
         ref={setRow}
         className={lineClass}
-        style={style}
         onClick={seek}
         onPointerDown={() => setPressed(true)}
         onPointerUp={() => setPressed(false)}
@@ -739,7 +782,6 @@ const LyricRow = memo(function LyricRow({
     <div
       ref={setRow}
       className={`${lineClass} lyric-swept ytm-word-sync`}
-      style={style}
       onClick={seek}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}

@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import type { Song } from '../api/models';
 import { actions, useApp, usePlayer } from '../state/store';
+import { t } from '../i18n';
 import { player } from '../player/player';
 import { SongRow } from '../components/SongRow';
 import { SmartArt } from '../components/SmartArt';
@@ -62,19 +63,19 @@ export function LibraryScreen() {
   return (
     <div className="feed">
       <h1 className="display-large page-gutter" style={{ margin: '8px 0 12px' }}>
-        Library
+        {t('library.title')}
       </h1>
 
       <div className="page-gutter shelf-header-row">
-        <h2 className="title-large">Playlists</h2>
-        <button className="text-button label-medium" onClick={() => setCreating(true)}>New playlist</button>
+        <h2 className="title-large">{t('library.playlists')}</h2>
+        <button className="text-button label-medium" onClick={() => setCreating(true)}>{t('library.newPlaylist')}</button>
       </div>
       {creating && (
         <div className="page-gutter" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input
             className="text-input body-medium"
-            placeholder="Playlist title"
-            aria-label="Playlist title"
+            placeholder={t('library.playlistTitle')}
+            aria-label={t('library.playlistTitle')}
             value={newTitle}
             autoFocus
             onChange={(e) => setNewTitle(e.target.value)}
@@ -82,7 +83,7 @@ export function LibraryScreen() {
             onKeyUp={(e) => e.key === 'Escape' && setCreating(false)}
           />
           <button className="text-button label-medium" onClick={create}>
-            Create
+            {t('library.create')}
           </button>
         </div>
       )}
@@ -94,28 +95,28 @@ export function LibraryScreen() {
             onOpen={() => setOpenPlaylistId(pl.id)}
             onDelete={() => {
               actions.deletePlaylist(pl.id);
-              actions.showToast(`Deleted ${pl.title}`);
+              actions.showToast(t('library.deletedToast', { title: pl.title }));
             }}
           />
         ))}
         {app.playlists.length === 0 && !creating && (
           <div className="body-medium" style={{ color: 'var(--on-surface-variant)' }}>
-            No playlists yet.
+            {t('library.noPlaylists')}
           </div>
         )}
       </div>
 
       <div className="page-gutter shelf-header-row">
-        <h2 className="title-large">Liked songs</h2>
+        <h2 className="title-large">{t('library.likedSongs')}</h2>
         {liked.length > 0 && (
-          <button className="text-button label-medium" onClick={() => playAll(liked, 'Liked songs')}>
-            Play all
+          <button className="text-button label-medium" onClick={() => playAll(liked, t('library.likedSongs'))}>
+            {t('library.playAll')}
           </button>
         )}
       </div>
       {liked.length === 0 ? (
         <div className="page-gutter empty-hint body-medium" style={{ color: 'var(--on-surface-variant)' }}>
-          Tracks you like land here. They are saved on this device.
+          {t('library.likedEmpty')}
         </div>
       ) : (
         <>
@@ -125,7 +126,7 @@ export function LibraryScreen() {
               song={song}
               current={current}
               playing={playerState.playing}
-              onPlay={() => playAll(liked.slice(liked.findIndex((s) => s.videoId === song.videoId)), 'Liked songs')}
+              onPlay={() => playAll(liked.slice(liked.findIndex((s) => s.videoId === song.videoId)), t('library.likedSongs'))}
               onToggleLiked={() => actions.toggleLiked(song)}
               onMenu={() => actions.openSongMenu(song)}
               liked
@@ -134,7 +135,7 @@ export function LibraryScreen() {
           {liked.length > PREVIEW_COUNT && (
             <ShowAllToggle
               expanded={showAllLiked}
-              label={`Show all ${liked.length} songs`}
+              label={t('library.showAllSongs', { n: liked.length })}
               onToggle={() => setShowAllLiked((v) => !v)}
             />
           )}
@@ -142,11 +143,11 @@ export function LibraryScreen() {
       )}
 
       <div className="page-gutter shelf-header-row">
-        <h2 className="title-large">History</h2>
+        <h2 className="title-large">{t('library.history')}</h2>
       </div>
       {history.length === 0 ? (
         <div className="page-gutter empty-hint body-medium" style={{ color: 'var(--on-surface-variant)' }}>
-          Plays are recorded here as you listen.
+          {t('library.playsEmpty')}
         </div>
       ) : (
         <>
@@ -156,7 +157,7 @@ export function LibraryScreen() {
               song={song}
               current={current}
               playing={playerState.playing}
-              onPlay={() => playAll(history.slice(history.findIndex((s) => s.videoId === song.videoId)), 'History')}
+              onPlay={() => playAll(history.slice(history.findIndex((s) => s.videoId === song.videoId)), t('library.history'))}
               onToggleLiked={() => actions.toggleLiked(song)}
               onMenu={() => actions.openSongMenu(song)}
               liked={app.liked.some((s) => s.videoId === song.videoId)}
@@ -165,7 +166,7 @@ export function LibraryScreen() {
           {history.length > PREVIEW_COUNT && (
             <ShowAllToggle
               expanded={showAllHistory}
-              label={`Show all ${history.length} plays`}
+              label={t('library.showAllPlays', { n: history.length })}
               onToggle={() => setShowAllHistory((v) => !v)}
             />
           )}
@@ -178,7 +179,7 @@ export function LibraryScreen() {
 function ShowAllToggle({ expanded, label, onToggle }: { expanded: boolean; label: string; onToggle: () => void }) {
   return (
     <button className="show-all-toggle label-medium" onClick={onToggle}>
-      {expanded ? 'Show less' : label}
+      {expanded ? t('library.showLess') : label}
     </button>
   );
 }
@@ -216,7 +217,7 @@ function PlaylistView({
         <SmartArt src={cover} videoId={coverVideo} size={720} radius={0} eager keepOriginalSize className="detail-header-art-wrap" />
         <div className="detail-header-scrim" />
         <div className="detail-header-content page-gutter">
-          <button className="icon-button detail-back" onClick={onBack} aria-label="Back">
+          <button className="icon-button detail-back" onClick={onBack} aria-label={t('aria.back')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M10.8 16.8q.3-.3.288-.7t-.288-.7L7.8 12.5h9.4q.375 0 .638-.263t.262-.637t-.262-.638t-.638-.262H7.8l3-3q.3-.3.3-.7t-.3-.7t-.7-.3t-.7.3L5.4 11.3q-.15.15-.213.325T5.125 12t.063.375t.212.325l4.6 4.6q.275.275.688.288t.712-.288Z" />
             </svg>
@@ -224,7 +225,7 @@ function PlaylistView({
           <div className="detail-title-wrap">
             <h1 className="headline-large detail-title">{playlist.title}</h1>
             <span className="body-medium detail-subtitle">
-              {songs.length === 1 ? '1 song' : `${songs.length} songs`}
+              {songs.length === 1 ? t('playlist.oneSong') : t('playlist.songs', { n: songs.length })}
             </span>
           </div>
         </div>
@@ -236,11 +237,11 @@ function PlaylistView({
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5.14v14.72q0 .575.5.8t.9-.06l10.6-7.36q.4-.275.4-.74t-.4-.74L9.4 4.4q-.4-.285-.9-.06T8 5.14Z" transform="translate(1 0)" />
             </svg>
-            Play
+            {t('playlist.play')}
           </button>
           {songs.length > 1 && (
             <button className="text-button label-medium" onClick={playShuffled}>
-              Shuffle
+              {t('playlist.shuffle')}
             </button>
           )}
         </div>
@@ -260,13 +261,13 @@ function PlaylistView({
             liked={app.liked.some((s) => s.videoId === song.videoId)}
             onRemove={() => {
               actions.removeFromPlaylist(playlist.id, song.videoId);
-              actions.showToast('Removed from playlist');
+              actions.showToast(t('playlist.removedToast'));
             }}
           />
         ))}
         {songs.length === 0 && (
           <div className="page-gutter body-medium" style={{ color: 'var(--on-surface-variant)', padding: '12px 20px' }}>
-            Empty playlist — add songs from any row's menu.
+            {t('playlist.empty')}
           </div>
         )}
       </div>
@@ -308,7 +309,7 @@ function PlaylistCard({
           {playlist.title}
         </div>
         <div className="label-small" style={{ color: 'var(--on-surface-variant)' }}>
-          {playlist.songs.length === 1 ? '1 song' : `${playlist.songs.length} songs`}
+          {playlist.songs.length === 1 ? t('playlist.oneSong') : t('playlist.songs', { n: playlist.songs.length })}
         </div>
       </div>
       <button
@@ -317,7 +318,7 @@ function PlaylistCard({
           e.stopPropagation();
           onDelete();
         }}
-        aria-label={`Delete ${playlist.title}`}
+        aria-label={t('aria.deletePlaylist', { title: playlist.title })}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <path d="M7 22q-.825 0-1.412-.587T5 20V7q0-.825.588-1.412T7 5h10q.825 0 1.413.588T19 7v13q0 .825-.587 1.413T17 22Zm3-14q-.425 0-.712.288T9 9v9q0 .425.288.713T10 19t.713-.288T11 18V9q0-.425-.288-.712T10 8Zm4 0q-.425 0-.712.288T13 9v9q0 .425.288.713T14 19t.713-.288T15 18V9q0-.425-.288-.712T14 8ZM8 5V3.5q0-.625.438-1.062T9.5 2h5q.625 0 1.063.438T16 3.5V5h2.5q.425 0 .713.288T19.5 6t-.287.713T18.5 7h-13q-.425 0-.712-.288T4.5 6t.288-.712T5.5 5Z" />

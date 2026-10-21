@@ -8,6 +8,7 @@
 import type { HomeShelf, ShelfItem } from '../api/models';
 import type { BrowseType } from '../api/models';
 import { SmartArt } from './SmartArt';
+import { t } from '../i18n';
 
 export const PAGE_GUTTER = 20;
 
@@ -146,10 +147,9 @@ export function SignInBanner({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div className="sign-in-banner page-gutter">
       <div className="body-medium">
-        <b style={{ fontWeight: 600 }}>Listening as a guest</b>
+        <b style={{ fontWeight: 600 }}>{t('common.guestTitle')}</b>
         <div style={{ color: 'var(--on-surface-variant)' }}>
-          Sign-in is not available in the web port — your likes, playlists and history are saved on this
-          device instead.
+          {t('common.guestBody')}
         </div>
       </div>
     </div>
@@ -191,7 +191,7 @@ export function MessageState({ title, message, onRetry }: { title: string; messa
       </div>
       {onRetry && (
         <button className="retry-button label-medium" onClick={onRetry}>
-          Try again
+          {t('msg.tryAgain')}
         </button>
       )}
     </div>

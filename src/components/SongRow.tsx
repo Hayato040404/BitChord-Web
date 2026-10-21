@@ -11,6 +11,7 @@ import { useRef, useState } from 'react';
 import type { Song } from '../api/models';
 import { SmartArt } from './SmartArt';
 import { LikeFilledIcon, LikeIcon, MoreIcon, PauseIcon, PlayIcon } from './icons';
+import { t } from '../i18n';
 
 interface SongRowProps {
   song: Song;
@@ -25,6 +26,11 @@ interface SongRowProps {
   /** Trailing node instead of the default like + menu buttons. */
   trailing?: React.ReactNode;
   onRemove?: () => void;
+  /** Queue reorder controls (queue page rows). */
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  moveDisabledUp?: boolean;
+  moveDisabledDown?: boolean;
 }
 
 export function SongRow({
@@ -38,6 +44,10 @@ export function SongRow({
   liked = false,
   trailing,
   onRemove,
+  onMoveUp,
+  onMoveDown,
+  moveDisabledUp = false,
+  moveDisabledDown = false,
 }: SongRowProps) {
   const [pressed, setPressed] = useState(false);
   const longPressTimer = useRef<number | null>(null);
@@ -106,25 +116,49 @@ export function SongRow({
         </span>
       </div>
       <div className="song-row-actions" onClick={(e) => e.stopPropagation()}>
+        {(onMoveUp || onMoveDown) && (
+          <span className="song-row-move">
+            <button
+              className="icon-button"
+              onClick={() => onMoveUp?.()}
+              disabled={moveDisabledUp}
+              aria-label={t('queue.moveUp')}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 10.8 7.7 15.1q-.275.275-.7.275t-.7-.275q-.3-.3-.3-.713t.3-.687L11.3 9.3q.3-.3.7-.3t.7.3l5 5q.275.275.288.688T17.7 15.4q-.3.3-.7.3t-.7-.3L12 10.8Z" />
+              </svg>
+            </button>
+            <button
+              className="icon-button"
+              onClick={() => onMoveDown?.()}
+              disabled={moveDisabledDown}
+              aria-label={t('queue.moveDown')}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 13.2l-4.3 4.3q-.275.275-.7.275t-.7-.275q-.3-.3-.3-.712t.3-.688l5-5q.3-.3.7-.3t.7.3l5 5q.275.275.288.688T17.7 17.5q-.3.3-.7.3t-.7-.3L12 13.2Z" />
+              </svg>
+            </button>
+          </span>
+        )}
         {isCurrent && playing ? (
           <PauseIcon size={20} style={{ color: 'var(--accent)' }} />
         ) : isCurrent ? (
           <PlayIcon size={20} style={{ color: 'var(--accent)' }} />
         ) : null}
         {onRemove && (
-          <button className="icon-button" onClick={onRemove} aria-label="Remove">
+          <button className="icon-button" onClick={onRemove} aria-label={t('aria.clear')}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l4.9-4.9q.275-.275-.7-.275t.7-.275t.7.275t.275.7t-.275.7l-4.9 4.9l4.9-4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275Z" />
             </svg>
           </button>
         )}
         {onToggleLiked && (
-          <button className="icon-button" onClick={onToggleLiked} aria-label="Like">
+          <button className="icon-button" onClick={onToggleLiked} aria-label={t('aria.like')}>
             {liked ? <LikeFilledIcon size={20} /> : <LikeIcon size={20} />}
           </button>
         )}
         {onMenu && !trailing && (
-          <button className="icon-button" onClick={onMenu} aria-label="More">
+          <button className="icon-button" onClick={onMenu} aria-label={t('aria.more')}>
             <MoreIcon size={20} />
           </button>
         )}

@@ -22,8 +22,10 @@ const SETTLE_VEL = 8;
 const HANDOVER_PX = 4;
 /** How long we stay out of the way after the reader scrolls by hand. */
 const USER_RESUME_SEC = 3;
-/** The sung line sits a little above centre — closer to where the eye rests. */
-const ANCHOR_FRACTION = 0.38;
+/** The sung line sits in the upper fifth, the way Apple Music frames it. */
+const ANCHOR_FRACTION = 0.2;
+/** ...but never under the floating header on a short landscape screen. */
+const ANCHOR_MIN_PX = 104;
 /** Ignore scroll events we know we caused, for this long after writing one. */
 const SUPPRESS_MS = 220;
 const SUPPRESS_MS_INSTANT = 300;
@@ -35,6 +37,11 @@ export interface LyricScrollController {
   step(dt: number): void;
   /** Scroll so [row] sits at the anchor line. */
   scrollToRow(row: HTMLElement, instant?: boolean): void;
+  /**
+   * Re-aim at [row] without resetting the user-scroll grace period. Used while
+   * a collapsing interlude shifts the lines under the active row.
+   */
+  trackRow(row: HTMLElement): void;
   /** True while the reader is driving the panel themselves. */
   isUserScrolling(): boolean;
   /** Drop all spring state, e.g. after the lyrics are re-laid out. */
@@ -95,6 +102,14 @@ export function createLyricScroll(container: HTMLElement): LyricScrollController
   };
   container.addEventListener('scroll', onScroll, { passive: true });
 
+  /** Where the container must scroll for [row]'s top to meet the anchor. */
+  const rowTarget = (row: HTMLElement): number => {
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const anchor = Math.max(container.clientHeight * ANCHOR_FRACTION, ANCHOR_MIN_PX);
+    return container.scrollTop + rowRect.top - containerRect.top - anchor;
+  };
+
   return {
     request,
 
@@ -127,12 +142,17 @@ export function createLyricScroll(container: HTMLElement): LyricScrollController
     },
 
     scrollToRow(row: HTMLElement, instant = false) {
-      const containerRect = container.getBoundingClientRect();
-      const rowRect = row.getBoundingClientRect();
-      const anchor = container.clientHeight * ANCHOR_FRACTION - rowRect.height / 2;
-      const next = container.scrollTop + rowRect.top - containerRect.top - anchor;
       suppressUntil = performance.now() + (instant ? SUPPRESS_MS_INSTANT : SUPPRESS_MS);
-      request(next, instant);
+      request(rowTarget(row), instant);
+    },
+
+    trackRow(row: HTMLElement) {
+      // Someone else moved the panel (or the reader is scrolling). Leave it be;
+      // `step` will hand over on its own once the grace period ends.
+      if (movedAway()) return;
+      const next = rowTarget(row);
+      if (target === undefined && Math.abs(container.scrollTop - next) < SETTLE_PX) return;
+      request(next);
     },
 
     isUserScrolling() {

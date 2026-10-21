@@ -321,6 +321,21 @@ class BitChordPlayer {
     this.emit();
   }
 
+  /** Reorder a row (drag-free: up/down buttons in the queue page). */
+  moveInQueue(from: number, to: number): void {
+    const queue = [...this.state.queue];
+    if (from === to) return;
+    if (from < 0 || from >= queue.length || to < 0 || to >= queue.length) return;
+    this.cancelCrossfade();
+    const [moved] = queue.splice(from, 1);
+    queue.splice(to, 0, moved);
+    if (this.state.index === from) this.state.index = to;
+    else if (from > this.state.index && to <= this.state.index) this.state.index += 1;
+    else if (from < this.state.index && to >= this.state.index) this.state.index -= 1;
+    this.state.queue = queue;
+    this.emit();
+  }
+
   /** Halt playback and forget the queue (nothing is left to play). */
   private stop(): void {
     this.cancelCrossfade();

@@ -24,12 +24,13 @@ import {
   SkipPreviousIcon,
 } from './icons';
 import type { TabId } from '../state/store';
+import { t } from '../i18n';
 
-const TABS: { id: TabId; label: string; icon: (props: { size?: number }) => JSX.Element }[] = [
-  { id: 'home', label: 'Home', icon: HomeIcon },
-  { id: 'explore', label: 'Explore', icon: ExploreIcon },
-  { id: 'library', label: 'Library', icon: LibraryIcon },
-  { id: 'search', label: 'Search', icon: SearchIcon },
+const TABS: { id: TabId; labelKey: string; icon: (props: { size?: number }) => JSX.Element }[] = [
+  { id: 'home', labelKey: 'tab.home', icon: HomeIcon },
+  { id: 'explore', labelKey: 'tab.explore', icon: ExploreIcon },
+  { id: 'library', labelKey: 'tab.library', icon: LibraryIcon },
+  { id: 'search', labelKey: 'tab.search', icon: SearchIcon },
 ];
 
 export function BottomBars() {
@@ -145,10 +146,10 @@ function TabPill({ app, compact }: { app: ReturnType<typeof useApp>; compact: bo
             key={tab.id}
             className={`tab-item${selected ? ' tab-item-selected' : ''}`}
             onClick={() => actions.setTab(tab.id)}
-            aria-label={tab.label}
+            aria-label={t(tab.labelKey)}
           >
             <Icon size={22} />
-            {!compact && <span className="tab-label label-small">{tab.label}</span>}
+            {!compact && <span className="tab-label label-small">{t(tab.labelKey)}</span>}
             {selected && <span className="tab-dot" />}
           </button>
         );
@@ -178,13 +179,13 @@ function ExpandedNowPlaying({ song, playing, busy, onPlayPause, onNext, onPrev }
         </span>
       </div>
       <div className="mini-player-transport">
-        <button className="icon-button" onClick={onPrev} aria-label="Previous">
+        <button className="icon-button" onClick={onPrev} aria-label={t('aria.previous')}>
           <SkipPreviousIcon size={22} />
         </button>
-        <button className="icon-button" onClick={onPlayPause} aria-label={playing ? 'Pause' : 'Play'}>
+        <button className="icon-button" onClick={onPlayPause} aria-label={playing ? t('aria.pause') : t('aria.play')}>
           {busy ? <span className="spinner" style={{ width: 20, height: 20 }} /> : playing ? <PauseIcon size={26} /> : <PlayIcon size={26} />}
         </button>
-        <button className="icon-button" onClick={onNext} aria-label="Next">
+        <button className="icon-button" onClick={onNext} aria-label={t('aria.next')}>
           <SkipNextIcon size={22} />
         </button>
       </div>
@@ -196,10 +197,10 @@ function InlineNowPlaying({ song, playing, busy, onPlayPause, onNext, onExpand }
   return (
     <div className="inline-player" onClick={onExpand} role="button" tabIndex={0}>
       <SmartArt src={song.thumbnailUrl} videoId={song.videoId} size={36} radius={7} eager />
-      <button className="icon-button" onClick={onPlayPause} aria-label={playing ? 'Pause' : 'Play'}>
+      <button className="icon-button" onClick={onPlayPause} aria-label={playing ? t('aria.pause') : t('aria.play')}>
         {busy ? <span className="spinner" style={{ width: 18, height: 18 }} /> : playing ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
       </button>
-      <button className="icon-button" onClick={onNext} aria-label="Next">
+      <button className="icon-button" onClick={onNext} aria-label={t('aria.next')}>
         <SkipNextIcon size={20} />
       </button>
     </div>

@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { fetchMoodAndGenres, fetchMoodGenreShelves } from '../api/repository';
 import type { HomeShelf, MoodGenre, ShelfItem } from '../api/models';
 import { actions, useApp } from '../state/store';
+import { t } from '../i18n';
 import { FeedSkeleton, MessageState, ShelfCarousel } from '../components/common';
 
 export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) => void }) {
@@ -26,7 +27,7 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
         if (!cancelled) setGenres(list);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load Explore');
+        if (!cancelled) setError(e instanceof Error ? e.message : t('explore.error'));
       });
     return () => {
       cancelled = true;
@@ -43,7 +44,7 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
         if (!cancelled) setShelves(feed);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load this mood');
+        if (!cancelled) setError(e instanceof Error ? e.message : t('explore.moodError'));
       });
     return () => {
       cancelled = true;
@@ -62,7 +63,7 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
           },
         ],
         0,
-        'Explore',
+        t('explore.title'),
       );
     } else if (item.browseId) {
       onOpenDetail(item);
@@ -73,7 +74,7 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
     return (
       <div className="feed">
         <div className="page-gutter" style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
-          <button className="icon-button" onClick={() => setSelected(null)} aria-label="Back">
+          <button className="icon-button" onClick={() => setSelected(null)} aria-label={t('aria.back')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M10.8 16.8q.3-.3.288-.7t-.288-.7L7.8 12.5h9.4q.375 0 .638-.263t.262-.637t-.262-.638t-.638-.262H7.8l3-3q.3-.3.3-.7t-.3-.7t-.7-.3t-.7.3L5.4 11.3q-.15.15-.213.325T5.125 12t.063.375t.212.325l4.6 4.6q.275.275.688.288t.712-.288Z" />
             </svg>
@@ -84,14 +85,14 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
         </div>
         {error ? (
           <MessageState
-            title="Something went wrong"
+            title={t('msg.somethingWrong')}
             message={error}
             onRetry={() => setReloadTick((n) => n + 1)}
           />
         ) : shelves === null ? (
           <FeedSkeleton firstIsHero={false} />
         ) : shelves.length === 0 ? (
-          <MessageState title="Nothing here" message="This mood has no shelves right now." />
+          <MessageState title={t('msg.nothingHere')} message={t('explore.moodEmpty')} />
         ) : (
           shelves.map((shelf, i) => (
             <ShelfCarousel key={`${shelf.title}-${i}`} shelf={shelf} onItemClick={onItem} />
@@ -104,11 +105,11 @@ export function ExploreScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem
   return (
     <div className="feed">
       <h1 className="display-large page-gutter" style={{ margin: '8px 0 12px' }}>
-        Explore
+        {t('explore.title')}
       </h1>
       {error && genres === null ? (
         <MessageState
-          title="Something went wrong"
+          title={t('msg.somethingWrong')}
           message={error}
           onRetry={() => setReloadTick((n) => n + 1)}
         />

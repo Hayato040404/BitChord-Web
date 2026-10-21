@@ -12,6 +12,7 @@ import { player } from '../player/player';
 import { fetchHome } from '../api/repository';
 import type { HomeShelf, Song } from '../api/models';
 import { actions, useApp } from '../state/store';
+import { t } from '../i18n';
 import { FeedSkeleton, HeroCard, MessageState, ShelfCarousel } from '../components/common';
 import type { ShelfItem } from '../api/models';
 
@@ -26,7 +27,7 @@ export function HomeScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) =
       const feed = await fetchHome();
       setShelves(feed);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load the feed');
+      setError(e instanceof Error ? e.message : t('home.error'));
     }
   };
 
@@ -67,7 +68,7 @@ export function HomeScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) =
   const recentsShelf: HomeShelf | null =
     recents.length > 0
       ? {
-          title: 'Recents',
+          title: t('home.recents'),
           items: recents.map((song) => ({
             title: song.title,
             subtitle: song.artist,
@@ -95,7 +96,7 @@ export function HomeScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem) =
         Home
       </h1>
       {error && shelves === null ? (
-        <MessageState title="Something went wrong" message={error} onRetry={load} />
+        <MessageState title={t('msg.somethingWrong')} message={error} onRetry={load} />
       ) : shelves === null ? (
         <FeedSkeleton />
       ) : (

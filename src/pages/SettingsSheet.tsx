@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { actions, useApp } from '../state/store';
 import { BUILTIN_SOURCES, checkSource } from '../api/sources';
 import type { StreamSource } from '../api/sources';
+import { t } from '../i18n';
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const app = useApp();
@@ -19,13 +20,13 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet frosted" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <div className="sheet-title title-large">Settings</div>
+        <div className="sheet-title title-large">{t('settings.title')}</div>
 
         <div className="body-medium" style={{ color: 'var(--on-surface-variant)', marginBottom: 16 }}>
-          Guest mode — likes, playlists and history are stored on this device.
+          {t('settings.guestNotice')}
         </div>
 
-        <SettingsRow title="Theme">
+        <SettingsRow title={t('settings.theme')}>
           <div className="chip-row">
             {(['system', 'light', 'dark'] as const).map((mode) => (
               <button
@@ -33,27 +34,27 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
                 className={`sleep-chip label-medium${settings.themeMode === mode ? ' sleep-chip-active' : ''}`}
                 onClick={() => actions.updateSettings({ themeMode: mode })}
               >
-                {mode[0].toUpperCase() + mode.slice(1)}
+                {t(`theme.${mode}`)}
               </button>
             ))}
           </div>
         </SettingsRow>
 
-        <SettingsRow title="Synced lyrics">
+        <SettingsRow title={t('settings.syncedLyrics')}>
           <Toggle
             checked={settings.syncedLyrics}
             onChange={(checked) => actions.updateSettings({ syncedLyrics: checked })}
           />
         </SettingsRow>
 
-        <SettingsRow title="AutoPlay (radio after queue ends)">
+        <SettingsRow title={t('settings.autoPlay')}>
           <Toggle
             checked={settings.autoplay}
             onChange={(checked) => actions.updateSettings({ autoplay: checked })}
           />
         </SettingsRow>
 
-        <SettingsRow title="Crossfade">
+        <SettingsRow title={t('settings.crossfade')}>
           <div className="chip-row">
             {[0, 2, 4, 6, 8].map((seconds) => (
               <button
@@ -61,23 +62,37 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
                 className={`sleep-chip label-medium${settings.crossfadeSeconds === seconds ? ' sleep-chip-active' : ''}`}
                 onClick={() => actions.updateSettings({ crossfadeSeconds: seconds })}
               >
-                {seconds === 0 ? 'Off' : `${seconds}s`}
+                {seconds === 0 ? t('crossfade.off') : t('crossfade.s', { s: seconds })}
               </button>
             ))}
           </div>
         </SettingsRow>
 
-        <SettingsRow title="Data saver (prefer lowest bitrate)">
+        <SettingsRow title={t('settings.dataSaver')}>
           <Toggle
             checked={settings.dataSaver}
             onChange={(checked) => actions.updateSettings({ dataSaver: checked })}
           />
         </SettingsRow>
 
+        <SettingsRow title={t('settings.language')}>
+          <div className="chip-row">
+            {(['en', 'ja'] as const).map((lang) => (
+              <button
+                key={lang}
+                className={`sleep-chip label-medium${settings.language === lang ? ' sleep-chip-active' : ''}`}
+                onClick={() => actions.updateSettings({ language: lang })}
+              >
+                {t(`language.${lang}`)}
+              </button>
+            ))}
+          </div>
+        </SettingsRow>
+
         <SourcesSection />
 
         <div className="settings-footer label-small" style={{ color: 'var(--on-surface-variant)' }}>
-          BitChord web — GPL v3. Not affiliated with YouTube or Google.
+          {t('settings.footer')}
         </div>
       </div>
     </div>
@@ -119,7 +134,7 @@ function SourcesSection() {
     setChecking(source.baseUrl);
     const ok = await checkSource(source);
     setChecking(null);
-    actions.showToast(ok ? `${source.name} is up` : `${source.name} is down`);
+    actions.showToast(ok ? t('sources.upToast', { name: source.name }) : t('sources.downToast', { name: source.name }));
   };
 
   const add = () => {
@@ -128,20 +143,20 @@ function SourcesSection() {
     try {
       parsed = new URL(clean);
     } catch {
-      actions.showToast('Enter a full https:// URL');
+      actions.showToast(t('sources.enterUrl'));
       return;
     }
     if (parsed.protocol !== 'https:') {
-      actions.showToast('Only https:// instances are supported');
+      actions.showToast(t('sources.onlyHttps'));
       return;
     }
     if (sources.some((s) => s.baseUrl === clean)) {
-      actions.showToast('That source is already in the list');
+      actions.showToast(t('sources.duplicate'));
       return;
     }
     const source: StreamSource = { name: parsed.host, baseUrl: clean, kind, custom: true };
     actions.updateSettings({ sources: [source, ...sources] });
-    actions.showToast(`Added ${parsed.host}`);
+    actions.showToast(t('sources.addedToast', { host: parsed.host }));
     setUrl('');
     setAdding(false);
   };
@@ -149,9 +164,9 @@ function SourcesSection() {
   return (
     <div className="sources-section">
       <div className="settings-row" style={{ marginBottom: 4 }}>
-        <span className="body-large">Sources</span>
+        <span className="body-large">{t('sources.title')}</span>
         <button className="text-button label-medium" onClick={() => setAdding(true)}>
-          Add
+          {t('sources.add')}
         </button>
       </div>
       {adding && (
@@ -175,7 +190,7 @@ function SourcesSection() {
             ))}
           </div>
           <button className="text-button label-medium" onClick={add}>
-            Save source
+            {t('sources.save')}
           </button>
         </div>
       )}
@@ -187,11 +202,11 @@ function SourcesSection() {
             </div>
             <div className="label-small" style={{ color: 'var(--on-surface-variant)' }}>
               {source.kind}
-              {source.custom ? ' · custom' : ''}
+              {source.custom ? ` ${t('sources.customTag')}` : ''}
             </div>
           </div>
           <button className="text-button label-medium" onClick={() => void check(source)}>
-            {checking === source.baseUrl ? '…' : 'Test'}
+            {checking === source.baseUrl ? '…' : t('sources.test')}
           </button>
           {source.custom && (
             <button
@@ -200,13 +215,13 @@ function SourcesSection() {
                 actions.updateSettings({ sources: sources.filter((s) => s.baseUrl !== source.baseUrl) })
               }
             >
-              Remove
+              {t('sources.remove')}
             </button>
           )}
         </div>
       ))}
       <div className="label-small" style={{ color: 'var(--on-surface-variant)', marginTop: 4 }}>
-        Built-ins: {BUILTIN_SOURCES.map((s) => s.name).join(', ')}
+        {t('sources.builtIns')}{BUILTIN_SOURCES.map((s) => s.name).join(', ')}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { fetchSearch, fetchSuggestions, SEARCH_FILTERS } from '../api/repository
 import type { SearchFilterId, SearchPage } from '../api/repository';
 import type { ShelfItem, Song } from '../api/models';
 import { actions, useApp, usePlayer } from '../state/store';
+import { t } from '../i18n';
 import { player } from '../player/player';
 import { SongRow } from '../components/SongRow';
 import { FeedSkeleton } from '../components/common';
@@ -77,7 +78,7 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
       })
       .catch((e) => {
         if (seq !== searchSeq.current) return;
-        setError(e instanceof Error ? e.message : 'Search failed');
+        setError(e instanceof Error ? e.message : t('search.failed'));
         setPage(null);
       })
       .finally(() => {
@@ -96,7 +97,7 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
     // from its list.
     const songs = rows.filter((row): row is Song => 'videoId' in row && row.videoId !== null);
     const index = songs.findIndex((s) => s.videoId === song.videoId);
-    actions.playSongs(songs, Math.max(0, index), 'Search');
+    actions.playSongs(songs, Math.max(0, index), t('tab.search'));
   };
 
   const onItem = (item: ShelfItem) => {
@@ -116,7 +117,7 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
         <input
           ref={inputRef}
           className="search-field body-large"
-          placeholder="Songs, artists, albums…"
+          placeholder={t('search.placeholder')}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -139,7 +140,7 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
               setError(null);
               setLoading(false);
             }}
-            aria-label="Clear"
+            aria-label={t('aria.clear')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l-4.9-4.9q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l4.9 4.9l4.9-4.9q.275-.275.7-.275t.7.275t.275.7t-.275.7l-4.9 4.9l4.9 4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275Z" />
@@ -177,7 +178,7 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
             className={`filter-chip label-medium${filter === f.id ? ' filter-chip-active' : ''}`}
             onClick={() => setFilter(f.id)}
           >
-            {f.label}
+            {t(`filter.${f.id}`)}
           </button>
         ))}
       </div>
@@ -186,12 +187,12 @@ export function SearchScreen({ onOpenDetail }: { onOpenDetail: (item: ShelfItem)
         <FeedSkeleton firstIsHero={false} />
       ) : error ? (
         <div className="message-state">
-          <div className="title-large">Search failed</div>
+          <div className="title-large">{t('search.failed')}</div>
           <div className="body-medium" style={{ color: 'var(--on-surface-variant)' }}>
             {error}
           </div>
           <button className="retry-button label-medium" onClick={() => runSearch(input, filter)}>
-            Try again
+            {t('msg.tryAgain')}
           </button>
         </div>
       ) : page ? (
@@ -234,7 +235,7 @@ function BrowseRow({ item, onClick }: { item: ShelfItem; onClick: () => void }) 
         </div>
       </div>
       <span className="label-small" style={{ color: 'var(--on-surface-variant)' }}>
-        {item.type === 'ALBUM' ? 'Album' : item.type === 'ARTIST' ? 'Artist' : item.type === 'PLAYLIST' ? 'Playlist' : ''}
+        {item.type === 'ALBUM' ? t('type.album') : item.type === 'ARTIST' ? t('type.artist') : item.type === 'PLAYLIST' ? t('type.playlist') : ''}
       </span>
     </button>
   );

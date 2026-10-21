@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { player } from '../player/player';
 import { actions, useApp, usePlayer } from '../state/store';
 import { formatDuration } from '../api/models';
+import { t } from '../i18n';
 import { MeshBackdrop } from '../components/MeshBackdrop';
 import { fetchLyrics } from '../lyrics/providers';
 import type { Lyrics } from '../lyrics/lyrics';
@@ -113,7 +114,7 @@ export function NowPlaying() {
       <MeshBackdrop imageUrl={art} trackKey={trackKey} />
       <div className="now-playing-content">
       <div className="now-playing-top safe-top">
-        <button className="icon-button" onClick={() => actions.setShowNowPlaying(false)} aria-label="Close">
+        <button className="icon-button" onClick={() => actions.setShowNowPlaying(false)} aria-label={t('aria.close')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
             <path d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l-4.9-4.9q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l4.9 4.9l4.9-4.9q.275-.275.7-.275t.7.275t.275.7t-.275.7l-4.9 4.9l4.9 4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275Z" />
           </svg>
@@ -124,7 +125,7 @@ export function NowPlaying() {
         <button
           className="icon-button"
           onClick={() => setShowSleep(true)}
-          aria-label="Sleep timer"
+          aria-label={t('player.sleepTimer')}
           style={{ color: player.sleepRemainingMs() !== null ? 'var(--accent)' : undefined }}
         >
           <SleepIcon size={22} />
@@ -143,7 +144,7 @@ export function NowPlaying() {
                 {song.artist}
               </div>
             </div>
-            <button className="icon-button" onClick={() => actions.toggleLiked(song)} aria-label="Like" style={{ color: liked ? 'var(--accent)' : '#fff' }}>
+            <button className="icon-button" onClick={() => actions.toggleLiked(song)} aria-label={t('aria.like')} style={{ color: liked ? 'var(--accent)' : '#fff' }}>
               {liked ? <LikeFilledIcon size={26} /> : <LikeIcon size={26} />}
             </button>
           </div>
@@ -152,7 +153,7 @@ export function NowPlaying() {
             <div className="player-error-row" role="alert">
               <span className="player-error-text body-medium">{playerState.error}</span>
               <button className="player-error-retry label-medium" onClick={() => player.retryCurrent()}>
-                Retry
+                {t('player.retry')}
               </button>
             </div>
           )}
@@ -163,15 +164,15 @@ export function NowPlaying() {
             <button
               className="icon-button"
               onClick={() => player.toggleShuffle()}
-              aria-label="Shuffle"
+              aria-label={t('aria.shuffle')}
               style={{ color: playerState.shuffle ? 'var(--accent)' : 'rgba(255,255,255,0.8)' }}
             >
               <ShuffleIcon size={22} />
             </button>
-            <button className="icon-button" onClick={() => player.previous()} aria-label="Previous">
+            <button className="icon-button" onClick={() => player.previous()} aria-label={t('aria.previous')}>
               <SkipPreviousIcon size={34} />
             </button>
-            <button className="play-pause-fab" onClick={() => player.togglePlayPause()} aria-label={playing ? 'Pause' : 'Play'}>
+            <button className="play-pause-fab" onClick={() => player.togglePlayPause()} aria-label={playing ? t('aria.pause') : t('aria.play')}>
               {busy ? (
                 <span className="spinner" style={{ width: 26, height: 26, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: '#fff' }} />
               ) : playing ? (
@@ -180,13 +181,13 @@ export function NowPlaying() {
                 <PlayGlyph />
               )}
             </button>
-            <button className="icon-button" onClick={() => player.next()} aria-label="Next">
+            <button className="icon-button" onClick={() => player.next()} aria-label={t('aria.next')}>
               <SkipNextIcon size={34} />
             </button>
             <button
               className="icon-button"
               onClick={() => player.cycleRepeat()}
-              aria-label="Repeat"
+              aria-label={t('aria.repeat')}
               style={{ color: playerState.repeat !== 'off' ? 'var(--accent)' : 'rgba(255,255,255,0.8)' }}
             >
               {playerState.repeat === 'one' ? <RepeatOneIcon size={22} /> : <RepeatIcon size={22} />}
@@ -195,13 +196,13 @@ export function NowPlaying() {
 
           <div className="now-playing-footer">
             <div className="now-playing-footer-group">
-              <button className="icon-button" onClick={() => setShowSpeed(true)} aria-label="Playback speed" style={{ color: 'rgba(255,255,255,0.8)' }}>
+              <button className="icon-button" onClick={() => setShowSpeed(true)} aria-label={t('aria.speed')} style={{ color: 'rgba(255,255,255,0.8)' }}>
                 <SpeedIcon size={20} />
               </button>
               <button
                 className="icon-button"
                 onClick={() => setShowVolume(true)}
-                aria-label="Volume"
+                aria-label={t('aria.volume')}
                 style={{ color: 'rgba(255,255,255,0.8)' }}
               >
                 <VolumeIcon size={20} />
@@ -214,7 +215,7 @@ export function NowPlaying() {
               <button
                 className="icon-button"
                 onClick={() => setPage('queue')}
-                aria-label="Queue"
+                aria-label={t('aria.queue')}
                 style={{ color: 'rgba(255,255,255,0.8)' }}
               >
                 <QueueIcon size={20} />
@@ -222,7 +223,7 @@ export function NowPlaying() {
               <button
                 className="icon-button now-playing-lyrics-button"
                 onClick={() => setPage('lyrics')}
-                aria-label="Lyrics"
+                aria-label={t('aria.lyrics')}
                 style={{ color: !lyricsLoading && lyrics ? '#fff' : 'rgba(255,255,255,0.5)' }}
               >
                 <LyricsIcon size={20} />
@@ -330,30 +331,30 @@ function QueuePage({ onBack }: { onBack: () => void }) {
   const upcoming = playerState.queue.slice(playerState.index + 1);
   const emptyHint =
     playerState.repeat === 'all'
-      ? 'Nothing else lined up — the queue loops from the top when this track ends.'
+      ? t('queue.emptyLoop')
       : playerState.repeat === 'one'
-        ? 'Nothing else lined up — this track repeats when it ends.'
+        ? t('queue.emptyRepeat')
         : app.settings.autoplay
-          ? 'Nothing else lined up — AutoPlay will keep the music going when this ends.'
-          : 'Nothing else lined up — add more songs from the ⋯ menu anywhere.';
+          ? t('queue.emptyAutoplay')
+          : t('queue.emptyAdd');
   return (
     <div className="queue-page">
       <div className="queue-top safe-top">
-        <button className="icon-button" onClick={onBack} aria-label="Back">
+        <button className="icon-button" onClick={onBack} aria-label={t('aria.back')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
             <path d="M10.8 16.8q.3-.3.288-.7t-.288-.7L7.8 12.5h9.4q.375 0 .638-.263t.262-.637t-.262-.638t-.638-.262H7.8l3-3q.3-.3.3-.7t-.3-.7t-.7-.3t-.7.3L5.4 11.3q-.15.15-.213.325T5.125 12t.063.375t.212.325l4.6 4.6q.275.275.688.288t.712-.288Z" />
           </svg>
         </button>
-        <span className="title-medium">Queue</span>
+        <span className="title-medium">{t('queue.title')}</span>
         {upcoming.length > 0 ? (
           <button
             className="text-button label-medium"
             onClick={() => {
               player.clearUpcoming();
-              actions.showToast('Cleared upcoming songs');
+              actions.showToast(t('queue.clearedToast'));
             }}
           >
-            Clear
+            {t('queue.clear')}
           </button>
         ) : (
           <span style={{ width: 40 }} />
@@ -362,7 +363,7 @@ function QueuePage({ onBack }: { onBack: () => void }) {
       <div className="queue-list">
         {current && (
           <>
-            <div className="queue-section-label label-medium">Now playing</div>
+            <div className="queue-section-label label-medium">{t('queue.nowPlaying')}</div>
             <SongRow
               song={current}
               current={current}
@@ -376,7 +377,7 @@ function QueuePage({ onBack }: { onBack: () => void }) {
         )}
         {upcoming.length > 0 ? (
           <>
-            <div className="queue-section-label label-medium">Next up · {upcoming.length}</div>
+            <div className="queue-section-label label-medium">{t('queue.nextUp', { n: upcoming.length })}</div>
             {upcoming.map((song, i) => {
               const index = playerState.index + 1 + i;
               return (
@@ -389,6 +390,10 @@ function QueuePage({ onBack }: { onBack: () => void }) {
                   onRemove={() => player.removeFromQueue(index)}
                   onToggleLiked={() => actions.toggleLiked(song)}
                   liked={app.liked.some((s) => s.videoId === song.videoId)}
+                  onMoveUp={() => player.moveInQueue(index, index - 1)}
+                  onMoveDown={() => player.moveInQueue(index, index + 1)}
+                  moveDisabledUp={index === 0}
+                  moveDisabledDown={i === upcoming.length - 1}
                 />
               );
             })}
@@ -415,10 +420,10 @@ function SleepSheet({ onClose }: { onClose: () => void }) {
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet frosted" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-title title-medium">Sleep timer</div>
+        <div className="sheet-title title-medium">{t('sleep.title')}</div>
         {remaining !== null && (
           <div className="body-medium" style={{ color: 'var(--on-surface-variant)', marginBottom: 8 }}>
-            Stopping in {formatDuration(remaining)}
+            {t('sleep.stoppingIn', { time: formatDuration(remaining) })}
           </div>
         )}
         <div className="sleep-grid">
@@ -431,7 +436,7 @@ function SleepSheet({ onClose }: { onClose: () => void }) {
                 onClose();
               }}
             >
-              {minutes} min
+              {t('sleep.min', { m: minutes })}
             </button>
           ))}
         </div>
@@ -443,7 +448,7 @@ function SleepSheet({ onClose }: { onClose: () => void }) {
               onClose();
             }}
           >
-            Cancel timer
+            {t('sleep.cancel')}
           </button>
         )}
       </div>
@@ -457,7 +462,7 @@ function SpeedSheet({ onClose }: { onClose: () => void }) {
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet frosted" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-title title-medium">Playback speed</div>
+        <div className="sheet-title title-medium">{t('player.playbackSpeed')}</div>
         <div className="sleep-grid">
           {speeds.map((speed) => (
             <button
@@ -483,12 +488,12 @@ function VolumeSheet({ onClose }: { onClose: () => void }) {
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet frosted" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-title title-medium">Volume</div>
+        <div className="sheet-title title-medium">{t('player.volume')}</div>
         <div className="volume-row">
           <button
             className="icon-button"
             onClick={() => player.setVolume(playerState.volume > 0 ? 0 : 1)}
-            aria-label={playerState.volume > 0 ? 'Mute' : 'Unmute'}
+            aria-label={playerState.volume > 0 ? t('aria.mute') : t('aria.unmute')}
           >
             <VolumeIcon size={22} />
           </button>
@@ -500,7 +505,7 @@ function VolumeSheet({ onClose }: { onClose: () => void }) {
             value={playerState.volume}
             onChange={(e) => player.setVolume(Number(e.target.value))}
             className="range-input"
-            aria-label="Volume"
+            aria-label={t('aria.volume')}
             style={{ flex: 1 }}
           />
           <span className="title-medium" style={{ minWidth: 44, textAlign: 'right' }}>

@@ -45,6 +45,7 @@ const K_LYRICS_BY_SONG = 'bitchord.lyricsBySong';
 
 export interface Settings {
   themeMode: 'system' | 'light' | 'dark';
+  language: 'en' | 'ja';
   crossfadeSeconds: number;
   autoplay: boolean;
   syncedLyrics: boolean;
@@ -69,6 +70,7 @@ export interface LyricsBySong {
 
 export const DEFAULT_SETTINGS: Settings = {
   themeMode: 'dark',
+  language: 'en',
   crossfadeSeconds: 0,
   autoplay: true,
   syncedLyrics: true,

@@ -28,7 +28,8 @@ import type { LyricLine, LyricWord } from './lyrics';
 
 // ---- constants (the same values as lyrics-engine.js) ------------------------
 
-const WORD_FEATHER_EM = 0.3;
+/** The am-lyrics wavefront is a fixed 30px soft edge, not a font-relative one. */
+const WORD_FEATHER_PX = 30;
 const WORD_LIFT_EM = 0.05;
 const WORD_LIFT_MIN_SEC = 1.0;
 const WORD_EMPHASIS_PREROLL_SEC = 0.4;
@@ -443,7 +444,6 @@ const measureRow = (row: HTMLElement): void => {
   state.sweepReady = true;
 
   const doc = row.ownerDocument;
-  const view = doc.defaultView;
 
   try {
     // 1. group words by the visual row they landed on, and measure each row
@@ -526,9 +526,8 @@ const measureRow = (row: HTMLElement): void => {
     state.sweepEnd = carry;
     state.sweepIndex = 0;
 
-    // 4. the feather is a font-relative px value, so it scales with the line
-    const fontPx = (view ? parseFloat(view.getComputedStyle(row).fontSize) : NaN) || 32;
-    row.style.setProperty('--feather', (WORD_FEATHER_EM * fontPx).toFixed(1));
+    // 4. the wavefront's soft edge: am-lyrics uses a fixed 30px feather
+    row.style.setProperty('--feather', WORD_FEATHER_PX.toFixed(1));
 
     // 5. per-word emphasis, scaled by how long the note is held
     state.words.forEach((span, index) => {

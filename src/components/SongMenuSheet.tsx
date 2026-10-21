@@ -11,6 +11,7 @@ import { actions, useApp } from '../state/store';
 import { player } from '../player/player';
 import { SmartArt } from './SmartArt';
 import { LikeFilledIcon, LikeIcon, PlusIcon } from './icons';
+import { t } from '../i18n';
 
 export function SongMenuSheet() {
   const app = useApp();
@@ -32,7 +33,7 @@ export function SongMenuSheet() {
     const title = newTitle.trim();
     if (!title) return;
     actions.createPlaylist(title, [song]);
-    actions.showToast(`Added to ${title}`);
+    actions.showToast(t('menu.addedToast', { title }));
     close();
   };
 
@@ -61,7 +62,7 @@ export function SongMenuSheet() {
                 } else {
                   player.playNext(song);
                 }
-                actions.showToast('Playing next');
+                actions.showToast(t('toast.playingNext'));
                 close();
               }}
             >
@@ -71,7 +72,7 @@ export function SongMenuSheet() {
               className="song-menu-row body-large"
               onClick={() => {
                 void player.addToQueue(song);
-                actions.showToast('Added to queue');
+                actions.showToast(t('toast.addedToQueue'));
                 close();
               }}
             >
@@ -86,24 +87,24 @@ export function SongMenuSheet() {
             >
               <span className="song-menu-with-icon">
                 {liked ? <LikeFilledIcon size={18} /> : <LikeIcon size={18} />}
-                {liked ? 'Remove from Liked songs' : 'Add to Liked songs'}
+                {liked ? t('menu.likeRemove') : t('menu.likeAdd')}
               </span>
             </button>
             <button className="song-menu-row body-large" onClick={() => setAddToOpen(true)}>
               <span className="song-menu-with-icon">
                 <PlusIcon size={18} />
-                Add to playlist
+                {t('menu.addToPlaylist')}
               </span>
             </button>
           </div>
         ) : (
           <div className="song-menu-options">
-            <button className="song-menu-back label-medium" onClick={() => setAddToOpen(false)} aria-label="Back">
-              Back
+            <button className="song-menu-back label-medium" onClick={() => setAddToOpen(false)} aria-label={t('menu.back')}>
+              {t('menu.back')}
             </button>
             {app.playlists.length === 0 && (
               <div className="body-medium" style={{ color: 'var(--on-surface-variant)', padding: '2px 0 8px' }}>
-                No playlists yet — make one below.
+                {t('menu.noPlaylists')}
               </div>
             )}
             {app.playlists.map((pl) => (
@@ -121,14 +122,14 @@ export function SongMenuSheet() {
             <div className="song-menu-new">
               <input
                 className="text-input body-medium"
-                placeholder="New playlist name"
-                aria-label="New playlist name"
+                placeholder={t('menu.newPlaylistName')}
+                aria-label={t('menu.newPlaylistName')}
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && createAndAdd()}
               />
               <button className="text-button label-medium" onClick={createAndAdd} disabled={!newTitle.trim()}>
-                Create
+                {t('menu.create')}
               </button>
             </div>
           </div>

@@ -15,6 +15,9 @@ installable PWA. Works on GitHub Pages and Vercel.
 | Crossfade (Media3) | Off/2/4/6/8 s overlap fade between queued tracks (Settings) |
 | Word/syllable lyrics (multiple sources) | LRCLIB synced lyrics with active-line highlight |
 | Sleep timer, playback speed, data saver | Same, in Settings / player footer |
+| Queue reordering | ▲/▼ buttons on every up-next row in the Queue page |
+| Keyboard shortcuts (desktop) | Space/K play-pause, ←/→ seek ±10 s, ↑/↓ volume, N/P next/previous, S shuffle, R repeat, M mute |
+| English UI |日本語 included — switch in Settings → Language (whole UI, toasts and sheets) |
 | Pluggable module sources | Piped / Invidious instance pool + custom sources (Settings → Sources) |
 | YouTube account sign-in | Not portable — guest library in localStorage (likes, playlists, history, recents) |
 | Downloads / local files / Discord / scrobbling / Jam | Not portable (no browser API surface for these) |
