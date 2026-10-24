@@ -81,8 +81,9 @@ const lyricUnitSegmenter = ((): Intl.Segmenter | null => {
 
 const CJK_GLYPH_RE =
   /[⺀-〾ぁ-㏿㐀-䶿一-鿿豈-﫿＀-ﾟ￠-￦가-힯]/;
-const CJK_TAIL_RE =
-  /[ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮーｰ゛゜々〆、。，．！？!?)）」』】〕》〉”’]/;
+/** Punctuation that belongs to the span before it, never a span of its own. */
+const MERGE_TAIL_RE =
+  /[ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮーｰ゛゜々〆、。，．,.;:！？!?)）」』】〕》〉”’"']/;
 
 /** One glyph, with the second it is sung. `null` = no timing of its own. */
 interface Glyph {
@@ -189,7 +190,7 @@ export const buildLyricWordUnits = (words: LyricWord[], lineEndSec: number): Lyr
       return;
     }
 
-    const isTail = CJK_TAIL_RE.test(glyph.c);
+    const isTail = MERGE_TAIL_RE.test(glyph.c);
     let needsNewUnit: boolean;
     if (useSegmenter) {
       needsNewUnit = !current || (!isTail && boundaries.has(index));

@@ -110,27 +110,29 @@ export function NowPlaying() {
   const liked = app.liked.some((s) => s.videoId === song.videoId);
 
   return (
-    <div className="now-playing">
+    <div className={`now-playing${page === 'lyrics' ? ' now-playing-lyrics' : ''}`}>
       <MeshBackdrop imageUrl={art} trackKey={trackKey} />
       <div className="now-playing-content">
-      <div className="now-playing-top safe-top">
-        <button className="icon-button" onClick={() => actions.setShowNowPlaying(false)} aria-label={t('aria.close')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l-4.9-4.9q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l4.9 4.9l4.9-4.9q.275-.275.7-.275t.7.275t.275.7t-.275.7l-4.9 4.9l4.9 4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275Z" />
-          </svg>
-        </button>
-        <div className="now-playing-source label-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>
-          {song.albumName ?? 'BitChord'}
-        </div>
-        <button
-          className="icon-button"
-          onClick={() => setShowSleep(true)}
-          aria-label={t('player.sleepTimer')}
-          style={{ color: player.sleepRemainingMs() !== null ? 'var(--accent)' : undefined }}
-        >
-          <SleepIcon size={22} />
-        </button>
-      </div>
+        {page === 'player' && (
+          <div className="now-playing-top safe-top">
+            <button className="icon-button" onClick={() => actions.setShowNowPlaying(false)} aria-label={t('aria.close')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l-4.9-4.9q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l4.9 4.9l4.9-4.9q.275-.275.7-.275t.7.275t.275.7t-.275.7l-4.9 4.9l4.9 4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275Z" />
+              </svg>
+            </button>
+            <div className="now-playing-source label-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>
+              {song.albumName ?? 'BitChord'}
+            </div>
+            <button
+              className="icon-button"
+              onClick={() => setShowSleep(true)}
+              aria-label={t('player.sleepTimer')}
+              style={{ color: player.sleepRemainingMs() !== null ? 'var(--accent)' : undefined }}
+            >
+              <SleepIcon size={22} />
+            </button>
+          </div>
+        )}
 
       {page === 'player' && (
         <div className="now-playing-player">

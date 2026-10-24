@@ -37,7 +37,7 @@ import { fetchLyrics } from '../lyrics/providers';
 import type { Song } from '../api/models';
 import { saveLyricsBySongEntry, clearLyricsBySongEntry } from '../data/library';
 import { t } from '../i18n';
-import { BackIcon, MoreIcon } from '../components/icons';
+import { BackIcon, EllipsisIcon } from '../components/icons';
 
 export function getSavedLyricsMeta(videoId: string): { offsetMs: number; manualTitle: string; manualArtist: string } | null {
   try {
@@ -209,9 +209,36 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
     setOffsetMs(getSavedLyricsMeta(song.videoId)?.offsetMs ?? 0);
   }, [song.videoId]);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const pageRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const rowsRef = useRef(new Map<number, HTMLDivElement>());
   const [sheet, setSheet] = useState<'none' | 'offset' | 'provider'>('none');
+
+  // The page owns the keyboard once it is open: Space / arrows keep driving
+  // the player, and Escape closes the topmost layer. Focusing the page (not
+  // the clicked line) also keeps the global shortcuts from being swallowed by
+  // a `role="button"` row after a seek.
+  useEffect(() => {
+    pageRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const onBackRef = useRef(onBack);
+  useEffect(() => {
+    onBackRef.current = onBack;
+  }, [onBack]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
+      if (sheet !== 'none') {
+        setSheet('none');
+        return;
+      }
+      onBackRef.current();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [sheet]);
 
   const registerRow = useCallback((index: number, el: HTMLDivElement | null) => {
     if (el) rowsRef.current.set(index, el);
@@ -249,6 +276,7 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
   const seekToLine = (line: LyricLine) => {
     if (!lyrics?.synced) return;
     player.seek(Math.max(0, line.at + offsetMs));
+    pageRef.current?.focus({ preventScroll: true });
   };
 
   const wordmark = lyrics
@@ -261,10 +289,16 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
   const hasDuet = lyrics?.synced === true && lyrics.lines.some((line) => line.alignment === 'end');
 
   return (
-    <div className="lyrics-page">
+    <div className="lyrics-page" ref={pageRef} tabIndex={-1}>
       <header className="lyrics-top">
         <div className="lyrics-top-inner">
-          <button className="lyrics-icon-button" type="button" onClick={onBack} aria-label={t('aria.back')}>
+          <button
+            className="lyrics-icon-button"
+            type="button"
+            onClick={onBack}
+            aria-label={t('aria.back')}
+            title={t('aria.back')}
+          >
             <BackIcon size={22} />
           </button>
           <div className="lyrics-meta">
@@ -300,7 +334,7 @@ export function LyricsPage({ lyrics, loading, song, durationMs, onBack }: Lyrics
               aria-label={t('lyrics.changeProvider')}
               title={t('lyrics.changeProvider')}
             >
-              <MoreIcon size={20} />
+              <EllipsisIcon size={20} />
             </button>
           </div>
         </div>
