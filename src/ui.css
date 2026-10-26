@@ -12,25 +12,32 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
+  padding: 10px 16px;
   position: sticky;
   top: 0;
   z-index: 30;
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(28px) saturate(1.7);
+  -webkit-backdrop-filter: blur(28px) saturate(1.7);
 }
 
 .topbar-logo {
-  height: 24px;
+  height: 26px;
   width: auto;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
 .topbar-title {
-  letter-spacing: 0.02em;
-  color: var(--on-surface-variant);
+  letter-spacing: -0.2px;
+  font-weight: 700;
+  color: var(--on-surface);
+  display: none;
+}
+@media (min-width: 900px) {
+  .topbar-title {
+    display: inline;
+  }
 }
 
 .icon-button {
@@ -116,8 +123,8 @@
   position: relative;
 }
 .tab-item-selected {
-  color: var(--on-bg);
-  background: var(--surface-variant);
+  color: var(--accent);
+  background: none;
 }
 .tab-label {
   font-size: 10px;
@@ -315,11 +322,7 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--accent);
   color: #fff;
 }
 

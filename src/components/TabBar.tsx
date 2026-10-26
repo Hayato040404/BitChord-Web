@@ -150,7 +150,6 @@ function TabPill({ app, compact }: { app: ReturnType<typeof useApp>; compact: bo
           >
             <Icon size={22} />
             {!compact && <span className="tab-label label-small">{t(tab.labelKey)}</span>}
-            {selected && <span className="tab-dot" />}
           </button>
         );
       })}
